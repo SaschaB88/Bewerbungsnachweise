@@ -28,4 +28,16 @@ contextBridge.exposeInMainWorld("api", {
       return [];
     }
   },
+  deleteApplication: async (id) => {
+    return await ipcRenderer.invoke("delete-application", id);
+  },
+  updateApplication: async (payload) => {
+    return await ipcRenderer.invoke("update-application", payload);
+  },
+  getApplicationFull: async (id) => {
+    return await ipcRenderer.invoke("get-application-full", id);
+  },
+  openApplicationWindow: async (id) => {
+    return await ipcRenderer.invoke("open-application-window", id);
+  },
 });

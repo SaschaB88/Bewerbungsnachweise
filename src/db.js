@@ -184,6 +184,109 @@ function listApplications(db, driverType = "better-sqlite3") {
   });
 }
 
+function deleteApplication(db, driverType = "better-sqlite3", id) {
+  const appId = Number(id);
+  if (!Number.isFinite(appId) || appId <= 0) {
+    throw new Error("Invalid id");
+  }
+  if (driverType === "better-sqlite3") {
+    const stmt = db.prepare("DELETE FROM applications WHERE id = ?");
+    const res = stmt.run(appId);
+    return { changes: res.changes || 0 };
+  }
+  return new Promise((resolve, reject) => {
+    db.run("DELETE FROM applications WHERE id = ?", [appId], function (err) {
+      if (err) return reject(err);
+      resolve({ changes: this.changes || 0 });
+    });
+  });
+}
+
+function updateApplication(db, driverType = "better-sqlite3", id, patch = {}) {
+  const appId = Number(id);
+  if (!Number.isFinite(appId) || appId <= 0) throw new Error("Invalid id");
+
+  const fields = {};
+  if (Object.prototype.hasOwnProperty.call(patch, "company")) {
+    const company = (patch.company || "").trim();
+    if (!company) throw new Error("'company' cannot be empty");
+    fields.company = company;
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "role")) {
+    const role = (patch.role || "").trim();
+    fields.role = role || null;
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "status")) {
+    const status = String(patch.status || "").trim();
+    if (!allowedStatuses.includes(status)) throw new Error(`Invalid status '${status}'. Allowed: ${allowedStatuses.join(", ")}`);
+    fields.status = status;
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "url")) {
+    const url = (patch.url || "").trim();
+    fields.url = url || null;
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, "notes")) {
+    const notes = (patch.notes || "").trim();
+    fields.notes = notes || null;
+  }
+
+  const keys = Object.keys(fields);
+  if (keys.length === 0) return { changes: 0 };
+
+  if (driverType === "better-sqlite3") {
+    const sets = keys.map(k => `${k} = ?`).join(", ");
+    const sql = `UPDATE applications SET ${sets} WHERE id = ?`;
+    const stmt = db.prepare(sql);
+    const values = keys.map(k => fields[k]);
+    const res = stmt.run(...values, appId);
+    return { changes: res.changes || 0 };
+  }
+
+  // sqlite3 path
+  return new Promise((resolve, reject) => {
+    const sets = keys.map(k => `${k} = ?`).join(", ");
+    const sql = `UPDATE applications SET ${sets} WHERE id = ?`;
+    const values = keys.map(k => fields[k]);
+    values.push(appId);
+    db.run(sql, values, function (err) {
+      if (err) return reject(err);
+      resolve({ changes: this.changes || 0 });
+    });
+  });
+}
+
+function getApplicationFull(db, driverType = "better-sqlite3", id) {
+  const appId = Number(id);
+  if (!Number.isFinite(appId) || appId <= 0) throw new Error("Invalid id");
+  if (driverType === "better-sqlite3") {
+    const app = db.prepare(
+      "SELECT id, company, role, status, url, notes, created_at FROM applications WHERE id = ?"
+    ).get(appId);
+    if (!app) return null;
+    const contacts = db.prepare(
+      "SELECT id, name, email, phone, title, linkedin, created_at FROM contacts WHERE application_id = ? ORDER BY id ASC"
+    ).all(appId);
+    const activities = db.prepare(
+      "SELECT id, type, date, notes, created_at FROM activities WHERE application_id = ? ORDER BY date DESC, id DESC"
+    ).all(appId);
+    const tags = db.prepare(
+      "SELECT t.id, t.name FROM tags t JOIN application_tags at ON at.tag_id = t.id WHERE at.application_id = ? ORDER BY t.name ASC"
+    ).all(appId);
+    return { application: app, contacts, activities, tags };
+  }
+  // sqlite3 path (simplified): only fetch application row
+  return new Promise((resolve, reject) => {
+    db.get(
+      "SELECT id, company, role, status, url, notes, created_at FROM applications WHERE id = ?",
+      [appId],
+      (err, row) => {
+        if (err) return reject(err);
+        resolve(row ? { application: row, contacts: [], activities: [], tags: [] } : null);
+      }
+    );
+  });
+}
+
 module.exports = {
   openDatabase,
   getStats,
@@ -191,5 +294,8 @@ module.exports = {
   resolveDbPath,
   createApplication,
   listApplications,
+  deleteApplication,
+  updateApplication,
+  getApplicationFull,
   allowedStatuses,
 };
