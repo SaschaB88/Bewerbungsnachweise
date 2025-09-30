@@ -1,95 +1,147 @@
-# Application Tracker
+# Electron MVP Dashboard
 
-Track all your job applications to different businesses in one place. Log details, set follow‑ups, and keep momentum during your job search.
+Minimal Electron-style project that renders a simple dashboard. It supports two modes:
+- Electron mode: launches a window and displays the dashboard UI.
+- Fallback mode: if Electron isn’t installed, prints the dashboard HTML to the console.
+
+This MVP includes a small test suite using Node’s built-in test runner.
 
 ## Features
-- Add and manage applications (company, role, status, notes)
-- Customizable statuses and pipelines (Applied → Interviewing → Offer → Hired/Rejection)
-- Reminders and follow‑ups with due dates
+- Create and manage applications (company, role, status, notes)
+- Customizable pipeline (Applied -> Interviewing -> Offer -> Hired/Rejected)
+- Reminders and follow-ups with due dates
 - Contacts per application (name, email, phone, LinkedIn)
-- Attach links and files (JD, resume version, cover letter)
+- Attach links and files (job description, resume version, cover letter)
 - Search, filters, and tags
-- Activity timeline per application (e.g., “Phone screen”, “On‑site”)
+- Activity timeline per application (e.g., Phone screen, On-site)
 - Import/Export CSV
-- Privacy‑first: local storage by default, optional sync later
+- Local-only by default; optional sync can be added later
+
+## Electron Architecture
+- Main process: app lifecycle, windows, file system, and database access.
+- Preload script: secure bridge (IPC) between renderer and main.
+- Renderer: UI (your choice, e.g., React with Vite) with no direct Node access.
+- Database: SQLite stored under Electron's userData path.
+
+Recommended defaults
+- SQLite library: `better-sqlite3` (synchronous, fast) or `sqlite3`.
+- Query layer (optional): Kysely, Drizzle, or Prisma.
+- UI stack (optional): React + Vite or Svelte + Vite.
 
 ## Data Model (Draft)
 - Application
-  - `id`
-  - `company`
-  - `position`
-  - `location`
-  - `source` (Referral, LinkedIn, Company site, etc.)
-  - `status` (Planned, Applied, Interviewing, Offer, Hired, Rejected, On Hold)
-  - `rating` (1–5)
-  - `salary_range` (text)
-  - `application_date` (date)
-  - `next_step` (text)
-  - `next_step_due` (date)
-  - `url` (posting or company page)
-  - `notes` (markdown)
-  - `tags` (array)
-  - `attachments` (paths/links)
+  - id, company, position, location
+  - source (Referral, LinkedIn, Company site, etc.)
+  - status (Planned, Applied, Interviewing, Offer, Hired, Rejected, On Hold)
+  - rating (1-5), salary_range (text)
+  - application_date (date)
+  - next_step (text), next_step_due (date)
+  - url (posting or company page)
+  - notes (markdown), tags (array)
+  - attachments (paths/links)
 - Contact
-  - `id`, `application_id`
-  - `name`, `email`, `phone`, `title`, `linkedin`
+  - id, application_id
+  - name, email, phone, title, linkedin
 - Activity
-  - `id`, `application_id`
-  - `type` (e.g., Phone Screen, On‑site, Take‑home, Follow‑up)
-  - `date`, `notes`
+  - id, application_id
+  - type (Phone Screen, On-site, Take-home, Follow-up)
+  - date, notes
 
-## Getting Started
-This README is stack‑agnostic so you can pick your preferred technologies. Suggested defaults:
-- Backend: Node.js (Express/Fastify) or Python (FastAPI)
-- Database: SQLite for local, PostgreSQL for sync/multi‑device
-- Frontend: React (Vite) or Next.js
-- Desktop app (optional): Electron or Tauri
+## Local Data and Storage
+- Database path: `app.getPath('userData')/app-tracker/apptracker.sqlite`.
+- Attachments: store under `app.getPath('userData')/app-tracker/attachments/`.
+- Backups: export CSV or a zipped backup of the database + attachments.
 
-### Local Setup (Template)
-1. Clone the repo
-   - `git clone <your-repo-url>`
-   - `cd <your-project-folder>`
-2. Configure environment
-   - Copy: `cp .env.example .env` (or create `.env`)
-   - Set database path, port, and any API keys if needed
-3. Install dependencies
-   - `npm install` (or `pnpm i` / `pip install -r requirements.txt`)
-4. Run in development
-   - `npm run dev` (or `uvicorn app:app --reload`)
-5. Open the app
-   - Web: `http://localhost:3000` (or printed URL)
-   - Desktop: start the Electron/Tauri dev task
+## Quick Start
+Prerequisites
+- Node.js >= 20
+
+Install
+- `npm install`
+
+Run tests
+- `npm test`
+
+Start the app
+- Fallback mode (no Electron installed): `npm start`
+  - Prints dashboard HTML to the console.
+- Electron mode (window):
+  1) `npm install --save-dev electron`
+  2) `npm start` (opens window showing the dashboard)
+
+Notes
+- The app’s entry point for Electron is `electron/main.js`.
+- The fallback/boot logic is in `src/boot.js`.
+
+Suggested scripts (add later to package.json)
+```json
+{
+  "main": "electron/main.js",
+  "scripts": {
+    "dev": "concurrently -k \"vite\" \"wait-on http://localhost:5173 && electron .\"",
+    "build": "vite build",
+    "dist": "electron-builder --dir",
+    "release": "electron-builder"
+  }
+}
+```
+
+Minimal electron-builder config (package.json)
+```json
+{
+  "build": {
+    "appId": "com.yourname.apptracker",
+    "productName": "Application Tracker",
+    "files": ["dist/**", "electron/**", "preload/**", "package.json"],
+    "extraMetadata": { "main": "electron/main.js" },
+    "directories": { "output": "release" },
+    "asar": true,
+    "win": { "target": ["nsis", "portable"] },
+    "mac": { "target": ["dmg"], "category": "public.app-category.productivity" },
+    "linux": { "target": ["AppImage"], "category": "Utility" }
+  }
+}
+```
+
+## Security Best Practices
+- Disable Node integration in the renderer: `nodeIntegration: false`.
+- Enable context isolation: `contextIsolation: true`.
+- Use a strict Content Security Policy (CSP) in `index.html`.
+- Only expose safe APIs in `preload` via `contextBridge.exposeInMainWorld`.
+- Validate and sanitize any IPC inputs on the main process.
+- Never store secrets in the renderer or bundle.
 
 ## Usage
 - Add an application with company, role, and link
 - Update status and log activities after each interview step
-- Set a reminder on `next_step_due` and check “Upcoming” view daily
-- Filter by status or tag (e.g., “Dream Companies”)
-- Export CSV weekly for backup or sharing
+- Set a reminder on `next_step_due` and check the Upcoming view daily
+- Filter by status or tag (e.g., "Dream Companies")
+- Export CSV weekly for backups
+
+## Packaging
+This MVP does not include packaging scripts yet. See the suggested `electron-builder` configuration below if you plan to add packaging later.
+
+## Project Structure (Proposed)
+- `electron/` main process (window + dashboard render)
+- `src/dashboard.js` dashboard model and HTML renderer
+- `src/boot.js` boot logic (Electron-or-fallback)
+- `scripts/start.js` Node start script
+- `test/` tests for dashboard and boot fallback
 
 ## Roadmap
-- Calendar view for upcoming follow‑ups
-- Email/Calendar integration (Gmail/Outlook) for automated reminders
-- Resume/Cover letter version tracking per application
+- Calendar view for upcoming follow-ups
+- OS notifications for reminders
 - Kanban pipeline view
-- Mobile‑friendly PWA
-- End‑to‑end encryption for sync
-
-## Project Structure (To Be Finalized)
-- `apps/` or `packages/` (mono‑repo friendly)
-- `api/` for backend services
-- `web/` for frontend
-- `desktop/` for Electron/Tauri wrapper
+- Resume/Cover letter version tracking per application
+- Optional encrypted sync across devices
+- Import from LinkedIn/CSV templates
 
 ## Contributing
-- Issues and PRs are welcome. Please open an issue to discuss larger features.
-- Use conventional commits if possible (e.g., `feat:`, `fix:`).
+- Issues and PRs are welcome. Please discuss larger features first.
+- Prefer conventional commits (e.g., `feat:`, `fix:`).
 
 ## License
-Choose a license for your project (e.g., MIT, Apache‑2.0). You can decide later—until then, all rights reserved by default.
+Choose a license (MIT recommended for open source). Until chosen, all rights reserved by default.
 
 ## Naming
-This document uses “Application Tracker” as a placeholder. Feel free to rename throughout once you pick your product name.
-
----
-Need help tailoring this README to your chosen stack or naming? Open an issue or update the sections above and we’ll refine further.
+This document uses "Application Tracker" as a placeholder. Rename across the repo once you decide your product name.
