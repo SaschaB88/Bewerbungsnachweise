@@ -11,5 +11,14 @@ contextBridge.exposeInMainWorld("api", {
       return { applications: 0, contacts: 0, activities: 0 };
     }
   },
+  getAllowedStatuses: async () => {
+    try {
+      return await ipcRenderer.invoke("get-allowed-statuses");
+    } catch {
+      return ["Planned","Applied","Interviewing","Offer","Hired","Rejected","On Hold"];
+    }
+  },
+  createApplication: async (payload) => {
+    return await ipcRenderer.invoke("create-application", payload);
+  },
 });
-

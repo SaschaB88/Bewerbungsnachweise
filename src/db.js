@@ -3,6 +3,16 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
+const allowedStatuses = [
+  "Planned",
+  "Applied",
+  "Interviewing",
+  "Offer",
+  "Hired",
+  "Rejected",
+  "On Hold",
+];
+
 function resolveDbPath(preferredPath) {
   if (preferredPath) {
     const dir = path.dirname(preferredPath);
@@ -122,9 +132,43 @@ function getStats(db, driverType = "better-sqlite3") {
   });
 }
 
+function createApplication(db, driverType = "better-sqlite3", input = {}) {
+  const company = (input.company || "").trim();
+  if (!company) throw new Error("'company' is required");
+  const role = (input.role || "").trim() || null;
+  let status = (input.status || "Planned").trim();
+  if (!allowedStatuses.includes(status)) {
+    throw new Error(`Invalid status '${status}'. Allowed: ${allowedStatuses.join(", ")}`);
+  }
+  const url = (input.url || "").trim() || null;
+  const notes = (input.notes || "").trim() || null;
+
+  if (driverType === "better-sqlite3") {
+    const stmt = db.prepare(
+      "INSERT INTO applications(company, role, status, url, notes) VALUES(?,?,?,?,?)"
+    );
+    const res = stmt.run(company, role, status, url, notes);
+    return { id: Number(res.lastInsertRowid) };
+  }
+
+  // sqlite3 callback path
+  return new Promise((resolve, reject) => {
+    db.run(
+      "INSERT INTO applications(company, role, status, url, notes) VALUES(?,?,?,?,?)",
+      [company, role, status, url, notes],
+      function (err) {
+        if (err) return reject(err);
+        resolve({ id: this.lastID });
+      }
+    );
+  });
+}
+
 module.exports = {
   openDatabase,
   getStats,
   seedSampleData,
   resolveDbPath,
+  createApplication,
+  allowedStatuses,
 };

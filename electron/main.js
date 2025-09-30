@@ -6,7 +6,7 @@
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("node:path");
 const { dashboardData, renderDashboard } = require("../src/dashboard");
-const { openDatabase, getStats, seedSampleData } = require("../src/db");
+const { openDatabase, getStats, seedSampleData, createApplication, allowedStatuses } = require("../src/db");
 
 let dbHandle = null;
 
@@ -50,6 +50,14 @@ app.whenReady().then(() => {
     const stats = await getStats(dbHandle, "better-sqlite3");
     return stats;
   });
+
+  ipcMain.handle("create-application", async (_evt, payload) => {
+    if (!dbHandle) throw new Error("Database not initialized");
+    const res = await createApplication(dbHandle, "better-sqlite3", payload || {});
+    return res;
+  });
+
+  ipcMain.handle("get-allowed-statuses", async () => allowedStatuses);
 
   createWindow();
 
