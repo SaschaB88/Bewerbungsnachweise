@@ -18,13 +18,17 @@ function dashboardData() {
 function renderDashboard(model) {
   const { title, stats, generatedAt } = model;
   const style = `
-    body { font-family: system-ui, Segoe UI, Roboto, Arial, sans-serif; margin: 24px; color: #222; }
-    header { margin-bottom: 16px; }
-    h1 { font-size: 22px; margin: 0 0 8px; }
-    .cards { display: flex; gap: 12px; }
-    .card { border: 1px solid #ddd; border-radius: 8px; padding: 12px 16px; min-width: 140px; background: #fafafa; }
-    .kpi { font-weight: 600; font-size: 18px; }
-    footer { margin-top: 20px; font-size: 12px; color: #666; }
+    :root{--bg:#0f1115;--bg2:#131722;--surface:rgba(255,255,255,0.06);--border:rgba(255,255,255,0.12);--text:#e6e9ef;--muted:#9aa4b2}
+    *{box-sizing:border-box}
+    body{margin:0;padding:24px;font-family:ui-sans-serif, system-ui, Segoe UI, Roboto, Arial, sans-serif;color:var(--text);background:radial-gradient(1200px 800px at 10% -10%, #1a2031 0%, transparent 60%),radial-gradient(1000px 700px at 100% 0%, #1a1f2b 0%, transparent 55%),linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%)}
+    header{margin-bottom:16px}
+    h1{font-size:26px;margin:0 0 6px;letter-spacing:.2px}
+    p{color:var(--muted);margin:0}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-top:14px}
+    .card{border:1px solid var(--border);border-radius:14px;padding:16px;background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));box-shadow:0 10px 24px rgba(0,0,0,.25)}
+    .kpi{font-weight:700;font-size:22px;margin-top:6px}
+    .label{color:var(--muted);font-size:13px}
+    footer{margin-top:20px;font-size:12px;color:var(--muted)}
   `;
   return `<!doctype html>
   <html lang="en">
@@ -39,7 +43,7 @@ function renderDashboard(model) {
         <h1>${escapeHtml(title)}</h1>
         <p>Quick KPIs of your application.</p>
       </header>
-      <section class="cards">
+      <section class="grid">
         ${card("Active Users", stats.users)}
         ${card("Sessions", stats.sessions)}
         ${card("Uptime (h)", stats.uptimeHours)}
@@ -50,7 +54,7 @@ function renderDashboard(model) {
 }
 
 function card(label, value) {
-  return `<div class="card"><div>${escapeHtml(label)}</div><div class="kpi">${escapeHtml(String(value))}</div></div>`;
+  return `<div class="card"><div class="label">${escapeHtml(label)}</div><div class="kpi">${escapeHtml(String(value))}</div></div>`;
 }
 
 function escapeHtml(s) {
@@ -66,4 +70,3 @@ module.exports = {
   dashboardData,
   renderDashboard,
 };
-
