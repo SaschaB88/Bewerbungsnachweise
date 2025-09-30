@@ -12,14 +12,19 @@ let dbHandle = null;
 
 function createWindow() {
   const win = new BrowserWindow({
-    width: 900,
-    height: 600,
+    width: 1280,
+    height: 860,
+    minWidth: 1100,
+    minHeight: 720,
+    center: true,
+    show: true,
+    backgroundColor: "#0f1115",
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
       preload: path.join(__dirname, "../preload/index.js"),
     },
-    title: "MVP Dashboard",
+    title: "Application Tracker",
   });
 
   // If React build exists, load it; otherwise use fallback HTML
@@ -90,6 +95,19 @@ app.whenReady().then(() => {
     return { ok: true };
   });
 
+  ipcMain.handle("focus-window", async (evt) => {
+    try {
+      const win = BrowserWindow.fromWebContents(evt.sender);
+      if (win) {
+        win.focus();
+        win.webContents.focus();
+      }
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  });
+
   createWindow();
 
   app.on("activate", () => {
@@ -105,8 +123,12 @@ module.exports = { createWindow };
 
 function createApplicationDetailWindow(appId) {
   const win = new BrowserWindow({
-    width: 720,
-    height: 800,
+    width: 920,
+    height: 820,
+    minWidth: 720,
+    minHeight: 640,
+    center: true,
+    backgroundColor: "#0f1115",
     title: `Application #${appId}`,
     webPreferences: {
       contextIsolation: true,

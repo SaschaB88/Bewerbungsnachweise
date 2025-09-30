@@ -40,4 +40,7 @@ contextBridge.exposeInMainWorld("api", {
   openApplicationWindow: async (id) => {
     return await ipcRenderer.invoke("open-application-window", id);
   },
+  focusWindow: async () => {
+    return await ipcRenderer.invoke("focus-window");
+  },
 });

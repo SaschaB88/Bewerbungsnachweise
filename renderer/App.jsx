@@ -4,7 +4,7 @@ export default function App() {
   const [stats, setStats] = useState({ applications: 0, contacts: 0, activities: 0 })
   const [showForm, setShowForm] = useState(false)
   const [notice, setNotice] = useState(null)
-  const [page, setPage] = useState('dashboard') // 'dashboard' | 'applications'
+  const [page, setPage] = useState('dashboard') // 'dashboard' | 'applications' | 'contacts' | 'actions'
 
   useEffect(() => {
     const api = window.api
@@ -15,27 +15,47 @@ export default function App() {
 
   return (
     <div className="container">
-      {page === 'dashboard' ? (
-        <DashboardView
-          stats={stats}
-          showForm={showForm}
-          setShowForm={setShowForm}
-          notice={notice}
-          onCreated={async () => {
-            setShowForm(false)
-            setNotice('Application created successfully')
-            setTimeout(() => setNotice(null), 2500)
-            const api = window.api
-            if (api && api.getStats) {
-              const s = await api.getStats()
-              setStats(s)
-            }
-          }}
-          onGoToApplications={() => setPage('applications')}
-        />
-      ) : (
-        <ApplicationsPage onBack={() => setPage('dashboard')} />
-      )}
+      <div className="layout">
+        <aside className="sidebar">
+          <div className="nav-title">Navigation</div>
+          <nav className="nav">
+            <button className={`nav-item ${page==='dashboard'?'active':''}`} onClick={async ()=>{ try { await window.api.focusWindow?.() } catch {} ; setPage('dashboard'); setTimeout(()=>window.dispatchEvent(new Event('hardFocusReset')),10)}}>Dashboard</button>
+            <button className={`nav-item ${page==='applications'?'active':''}`} onClick={async ()=>{ try { await window.api.focusWindow?.() } catch {} ; setPage('applications'); setTimeout(()=>window.dispatchEvent(new Event('hardFocusReset')),10)}}>Deine Bewerbungen</button>
+            <button className={`nav-item ${page==='contacts'?'active':''}`} onClick={()=>setPage('contacts')}>Kontakte</button>
+            <button className={`nav-item ${page==='actions'?'active':''}`} onClick={()=>setPage('actions')}>Aktionen</button>
+          </nav>
+        </aside>
+        <main className="content">
+          {page === 'dashboard' && (
+            <DashboardView
+              stats={stats}
+              showForm={showForm}
+              setShowForm={setShowForm}
+              notice={notice}
+              onCreated={async () => {
+                setShowForm(false)
+                setNotice('Application created successfully')
+                setTimeout(() => setNotice(null), 2500)
+                const api = window.api
+                if (api && api.getStats) {
+                  const s = await api.getStats()
+                  setStats(s)
+                }
+              }}
+              onGoToApplications={() => setPage('applications')}
+            />
+          )}
+          {page === 'applications' && (
+            <ApplicationsPage onBack={() => setPage('dashboard')} />
+          )}
+          {page === 'contacts' && (
+            <ContactsPage />
+          )}
+          {page === 'actions' && (
+            <ActionsPage />
+          )}
+        </main>
+      </div>
     </div>
   )
 }
@@ -84,6 +104,7 @@ function ApplicationsPage({ onBack }) {
   const [notice, setNotice] = useState(null)
   const [showForm, setShowForm] = useState(false)
   const [editItem, setEditItem] = useState(null)
+  const [confirmItem, setConfirmItem] = useState(null)
 
   useEffect(() => {
     let mounted = true
@@ -104,10 +125,14 @@ function ApplicationsPage({ onBack }) {
   return (
     <div>
       <header>
-        <h1>Applications</h1>
-        <p>All job applications in the database.</p>
+        <h1>Deine Bewerbungen</h1>
+        <p>Alle Bewerbungen in deiner Datenbank.</p>
         <div className="actions">
-          <button className="btn btn-primary" onClick={() => setShowForm(v => !v)}>{showForm ? 'Close' : 'Add New Application'}</button>
+          <button className="btn btn-primary" onClick={async () => {
+            try { await window.api.focusWindow?.() } catch {}
+            setShowForm(v => !v)
+            setTimeout(() => { window.dispatchEvent(new Event('hardFocusReset')) }, 10)
+          }}>{showForm ? 'Close' : 'Add New Application'}</button>
           <button className="btn btn-ghost" onClick={onBack}>Back to Dashboard</button>
         </div>
       </header>
@@ -147,16 +172,17 @@ function ApplicationsPage({ onBack }) {
               <tbody>
                 {apps.map(a => {
                   const statusKey = String(a.status || '').replace(' ', '-')
+                  const clickable = !showForm && !editItem
+                  const rowProps = clickable ? {
+                    className: 'row-clickable',
+                    onClick: (e) => {
+                      const tag = e.target.tagName.toLowerCase()
+                      if (tag === 'button' || tag === 'a' || e.target.closest('button') || e.target.closest('a')) return
+                      window.api.openApplicationWindow(a.id)
+                    }
+                  } : {}
                   return (
-                    <tr
-                      key={a.id}
-                      className="row-clickable"
-                      onClick={(e) => {
-                        const tag = e.target.tagName.toLowerCase()
-                        if (tag === 'button' || tag === 'a' || e.target.closest('button') || e.target.closest('a')) return
-                        window.api.openApplicationWindow(a.id)
-                      }}
-                    >
+                    <tr key={a.id} {...rowProps}>
                       <td>{a.id}</td>
                       <td>{a.company}</td>
                       <td>{a.role || ''}</td>
@@ -169,22 +195,11 @@ function ApplicationsPage({ onBack }) {
                         <div className="actions">
                           <button
                             className="btn"
-                            onClick={() => setEditItem(a)}
+                            onClick={(e) => { e.stopPropagation(); setEditItem(a); }}
                           >Edit</button>
                           <button
                             className="btn btn-danger"
-                            onClick={async () => {
-                              try {
-                                const ok = window.confirm(`Delete application #${a.id} (${a.company})?`)
-                                if (!ok) return
-                                await window.api.deleteApplication(a.id)
-                                setApps(prev => prev.filter(x => x.id !== a.id))
-                                setNotice('Application deleted')
-                                setTimeout(() => setNotice(null), 2000)
-                              } catch (e) {
-                                setError(e?.message || String(e))
-                              }
-                            }}
+                            onClick={(e) => { e.stopPropagation(); setConfirmItem(a) }}
                           >Delete</button>
                         </div>
                       </td>
@@ -213,6 +228,64 @@ function ApplicationsPage({ onBack }) {
           />
         </div>
       )}
+
+      {confirmItem && (
+        <div className="modal-backdrop" onClick={() => setConfirmItem(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+            <h2>Eintrag löschen?</h2>
+            <p>Möchtest du die Bewerbung “{confirmItem.company}” wirklich löschen? Diese Aktion kann nicht rückgängig gemacht werden.</p>
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => setConfirmItem(null)}>Abbrechen</button>
+              <button
+                className="btn btn-danger"
+                onClick={async () => {
+                  try {
+                    await window.api.deleteApplication(confirmItem.id)
+                    setConfirmItem(null)
+                    setApps(prev => prev.filter(x => x.id !== confirmItem.id))
+                    setNotice('Application deleted')
+                    setTimeout(() => setNotice(null), 2000)
+                    // Reset focus state after deletion
+                    try { document.activeElement && document.activeElement.blur() } catch {}
+                    try { await window.api.focusWindow?.() } catch {}
+                    setTimeout(() => { window.dispatchEvent(new Event('hardFocusReset')) }, 10)
+                  } catch (e) {
+                    setError(e?.message || String(e))
+                  }
+                }}
+              >Löschen</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ContactsPage() {
+  return (
+    <div>
+      <header>
+        <h1>Kontakte</h1>
+        <p>Verwalte Kontakte zu deinen Bewerbungen.</p>
+      </header>
+      <div className="panel">
+        <p>Diese Ansicht ist noch leer. Demnächst kannst du hier Kontakte hinzufügen und verwalten.</p>
+      </div>
+    </div>
+  )
+}
+
+function ActionsPage() {
+  return (
+    <div>
+      <header>
+        <h1>Aktionen</h1>
+        <p>Schnellzugriffe und nützliche Aktionen.</p>
+      </header>
+      <div className="panel">
+        <p>Diese Ansicht ist noch leer. Hier könnten Batch-Operationen, Exporte und weitere Tools erscheinen.</p>
+      </div>
     </div>
   )
 }
@@ -230,12 +303,18 @@ function AddApplicationForm({ onCreated }) {
   })
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
+  const companyRef = React.useRef(null)
 
   useEffect(() => {
     const api = window.api
     if (api && api.getAllowedStatuses) {
       api.getAllowedStatuses().then(setAllowed).catch(() => {})
     }
+    // Autofocus company on mount
+    setTimeout(() => { try { companyRef.current?.focus() } catch {} }, 0)
+    const onHardFocus = () => { try { companyRef.current?.focus() } catch {} }
+    window.addEventListener('hardFocusReset', onHardFocus)
+    return () => window.removeEventListener('hardFocusReset', onHardFocus)
   }, [])
 
   function onChange(e) {
@@ -281,7 +360,7 @@ function AddApplicationForm({ onCreated }) {
       <div className="form-grid">
         <div className="form-row">
           <label>Company*</label>
-          <input placeholder="e.g., OpenAI" name="company" value={form.company} onChange={onChange} required />
+          <input ref={companyRef} placeholder="e.g., OpenAI" name="company" value={form.company} onChange={onChange} required />
         </div>
         <div className="form-row">
           <label>Role</label>
@@ -323,12 +402,17 @@ function EditApplicationForm({ item, onCancel, onSaved }) {
   })
   const [error, setError] = useState(null)
   const [submitting, setSubmitting] = useState(false)
+  const companyRef = React.useRef(null)
 
   useEffect(() => {
     const api = window.api
     if (api && api.getAllowedStatuses) {
       api.getAllowedStatuses().then(setAllowed).catch(() => {})
     }
+    setTimeout(() => { try { companyRef.current?.focus() } catch {} }, 0)
+    const onHardFocus = () => { try { companyRef.current?.focus() } catch {} }
+    window.addEventListener('hardFocusReset', onHardFocus)
+    return () => window.removeEventListener('hardFocusReset', onHardFocus)
   }, [])
 
   function onChange(e) {
@@ -374,7 +458,7 @@ function EditApplicationForm({ item, onCancel, onSaved }) {
       <div className="form-grid">
         <div className="form-row">
           <label>Company*</label>
-          <input name="company" value={form.company} onChange={onChange} required />
+          <input ref={companyRef} name="company" value={form.company} onChange={onChange} required />
         </div>
         <div className="form-row">
           <label>Role</label>
