@@ -56,22 +56,56 @@ Recommended defaults
 Prerequisites
 - Node.js >= 20
 
-Install
+Install base deps
 - `npm install`
 
 Run tests
 - `npm test`
 
-Start the app
-- Fallback mode (no Electron installed): `npm start`
-  - Prints dashboard HTML to the console.
-- Electron mode (window):
-  1) `npm install --save-dev electron`
-  2) `npm start` (opens window showing the dashboard)
+Start in console (fallback)
+- `npm start`
+- Prints the dashboard HTML to the console (no Electron required).
+
+Start Electron window (fallback HTML if no React build yet)
+- `npm run start:electron`
 
 Notes
-- The app’s entry point for Electron is `electron/main.js`.
-- The fallback/boot logic is in `src/boot.js`.
+- Electron entry: `electron/main.js` (loads `dist/index.html` if present, else fallback HTML).
+- Fallback/boot logic: `src/boot.js`.
+
+## Database (SQLite)
+- Schema lives in `db/schema.sql`.
+- DB helper in `src/db.js` opens a SQLite DB, applies schema, and can seed sample data.
+- Default DB path in Electron: `app.getPath('userData')/apptracker.sqlite`.
+- Default DB path outside Electron: `./data/apptracker.sqlite`.
+
+Migrate and seed (requires a SQLite driver):
+- Install one driver:
+  - Recommended: `npm install better-sqlite3`
+  - Alternative: `npm install sqlite3`
+- Create schema: `npm run db:migrate`
+- Seed sample data: `npm run db:seed`
+
+## React Renderer
+- Source in `renderer/` with Vite config in `vite.config.js`.
+- Install UI deps:
+  - `npm install react react-dom`
+  - `npm install -D vite @vitejs/plugin-react`
+- Dev renderer only: `npm run dev` (serves `renderer/` at http://localhost:5173)
+- Build renderer: `npm run build` (outputs to `dist/`)
+- Show built UI in Electron: `npm run start:electron` (loads `dist/index.html` if it exists)
+
+Tip: For a live dev loop inside Electron, you can extend `electron/main.js` to load the Vite dev server URL when available; this MVP keeps Electron loading local `dist/` for simplicity.
+
+## Troubleshooting
+- Native module ABI mismatch (better-sqlite3)
+  - Symptom: error mentions `NODE_MODULE_VERSION` mismatch when starting Electron.
+  - Reason: Electron’s Node version differs from your system Node. Rebuild native module for Electron.
+  - Fix:
+    1) Install: `npm install -D electron-rebuild`
+    2) Rebuild for Electron: `npm run rebuild:electron`
+    3) If needed, rebuild for Node for CLI scripts: `npm run rebuild:node`
+  - Manual alternative: `npx electron-rebuild -f -w better-sqlite3`
 
 Suggested scripts (add later to package.json)
 ```json
@@ -123,9 +157,12 @@ This MVP does not include packaging scripts yet. See the suggested `electron-bui
 
 ## Project Structure (Proposed)
 - `electron/` main process (window + dashboard render)
+- `preload/` IPC bridge for safe APIs (e.g., `get-stats`)
 - `src/dashboard.js` dashboard model and HTML renderer
 - `src/boot.js` boot logic (Electron-or-fallback)
+- `src/db.js` SQLite helper (open, migrate, seed, stats)
 - `scripts/start.js` Node start script
+- `scripts/migrate.js`, `scripts/seed.js` DB scripts
 - `test/` tests for dashboard and boot fallback
 
 ## Roadmap
