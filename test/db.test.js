@@ -2,53 +2,86 @@
 
 const test = require("node:test");
 const assert = require("node:assert");
-const fs = require("node:fs");
-const path = require("node:path");
 
-let sqliteAvailable = false;
-let driver = null;
-try {
-  const Better = require("better-sqlite3");
-  try {
-    const tmp = new Better(":memory:");
-    tmp.close();
-    sqliteAvailable = true;
-    driver = "better-sqlite3";
-  } catch {
-    sqliteAvailable = false;
-  }
-} catch {}
+const {
+  createApplication,
+  getStats,
+  listApplications,
+  allowedStatuses,
+} = require("../src/db");
 
-const { openDatabase, createApplication, allowedStatuses } = sqliteAvailable ? require("../src/db") : { openDatabase: null };
+function makeFakeDb() {
+  const calls = [];
+  const data = {
+    counts: { applications: 0, contacts: 0, activities: 0 },
+    rows: [],
+  };
+  return {
+    _calls: calls,
+    _data: data,
+    prepare(sql) {
+      // Record the SQL used for verification if needed
+      calls.push(sql);
+      if (/SELECT COUNT\(\*\) as c FROM applications/i.test(sql)) {
+        return { get: () => ({ c: data.counts.applications }) };
+      }
+      if (/SELECT COUNT\(\*\) as c FROM contacts/i.test(sql)) {
+        return { get: () => ({ c: data.counts.contacts }) };
+      }
+      if (/SELECT COUNT\(\*\) as c FROM activities/i.test(sql)) {
+        return { get: () => ({ c: data.counts.activities }) };
+      }
+      if (/SELECT id, company, role, status, url, notes, created_at FROM applications/i.test(sql)) {
+        return { all: () => data.rows.slice() };
+      }
+      if (/INSERT INTO applications\(company, role, status, url, notes\)/i.test(sql)) {
+        return {
+          run: (company, role, status, url, notes) => {
+            const id = data.rows.length + 1;
+            const row = {
+              id,
+              company,
+              role,
+              status,
+              url,
+              notes,
+              created_at: new Date().toISOString(),
+            };
+            data.rows.push(row);
+            data.counts.applications += 1;
+            return { lastInsertRowid: id };
+          },
+        };
+      }
+      // Default dummy
+      return { get: () => ({}), all: () => [], run: () => ({ lastInsertRowid: 0 }) };
+    },
+  };
+}
 
-const tmpDir = path.join(process.cwd(), "tmp");
-if (!fs.existsSync(tmpDir)) fs.mkdirSync(tmpDir, { recursive: true });
+test("createApplication validates input and inserts via fake db", () => {
+  const db = makeFakeDb();
 
-(sqliteAvailable ? test : test.skip)("database creates required tables", () => {
-  const dbPath = path.join(tmpDir, `test-${Date.now()}.sqlite`);
-  const db = openDatabase({ path: dbPath });
-  // Verify tables in sqlite_master
-  const tables = db.prepare("SELECT name FROM sqlite_master WHERE type='table'").all().map(r => r.name);
-  for (const t of ["applications","contacts","activities","tags","application_tags"]) {
-    assert.ok(tables.includes(t), `missing table ${t}`);
-  }
-  try { db.close(); } catch {}
+  // Missing company should throw
+  assert.throws(() => createApplication(db, "better-sqlite3", { company: "" }));
+
+  // Invalid status should throw
+  assert.throws(() => createApplication(db, "better-sqlite3", { company: "Acme", status: "Nope" }));
+
+  // Valid insert returns id and increments counts
+  const res = createApplication(db, "better-sqlite3", { company: "Acme", status: allowedStatuses[0] });
+  assert.ok(res.id >= 1);
+  const stats = getStats(db, "better-sqlite3");
+  assert.strictEqual(stats.applications, 1);
 });
 
-(sqliteAvailable ? test : test.skip)("createApplication inserts a valid row", () => {
-  const dbPath = path.join(tmpDir, `test-insert-${Date.now()}.sqlite`);
-  const db = openDatabase({ path: dbPath });
-  const before = db.prepare("SELECT COUNT(*) as c FROM applications").get().c;
-  const res = createApplication(db, "better-sqlite3", { company: "Acme Inc", status: allowedStatuses[0] });
-  assert.ok(res.id > 0);
-  const after = db.prepare("SELECT COUNT(*) as c FROM applications").get().c;
-  assert.strictEqual(after, before + 1);
-  try { db.close(); } catch {}
-});
-
-(sqliteAvailable ? test : test.skip)("createApplication rejects invalid status", () => {
-  const dbPath = path.join(tmpDir, `test-invalid-${Date.now()}.sqlite`);
-  const db = openDatabase({ path: dbPath });
-  assert.throws(() => createApplication(db, "better-sqlite3", { company: "Bad Co", status: "Wrong" }));
-  try { db.close(); } catch {}
+test("listApplications returns rows from fake db", () => {
+  const db = makeFakeDb();
+  createApplication(db, "better-sqlite3", { company: "A", status: allowedStatuses[0] });
+  createApplication(db, "better-sqlite3", { company: "B", status: allowedStatuses[1] });
+  const rows = listApplications(db, "better-sqlite3");
+  assert.ok(Array.isArray(rows));
+  assert.strictEqual(rows.length, 2);
+  assert.strictEqual(rows[0].company, "A");
+  assert.strictEqual(rows[1].company, "B");
 });

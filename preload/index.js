@@ -21,4 +21,11 @@ contextBridge.exposeInMainWorld("api", {
   createApplication: async (payload) => {
     return await ipcRenderer.invoke("create-application", payload);
   },
+  listApplications: async () => {
+    try {
+      return await ipcRenderer.invoke("list-applications");
+    } catch {
+      return [];
+    }
+  },
 });

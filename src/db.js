@@ -164,11 +164,32 @@ function createApplication(db, driverType = "better-sqlite3", input = {}) {
   });
 }
 
+function listApplications(db, driverType = "better-sqlite3") {
+  if (driverType === "better-sqlite3") {
+    const rows = db
+      .prepare(
+        "SELECT id, company, role, status, url, notes, created_at FROM applications ORDER BY created_at DESC, id DESC"
+      )
+      .all();
+    return rows;
+  }
+  return new Promise((resolve, reject) => {
+    db.all(
+      "SELECT id, company, role, status, url, notes, created_at FROM applications ORDER BY created_at DESC, id DESC",
+      (err, rows) => {
+        if (err) return reject(err);
+        resolve(rows || []);
+      }
+    );
+  });
+}
+
 module.exports = {
   openDatabase,
   getStats,
   seedSampleData,
   resolveDbPath,
   createApplication,
+  listApplications,
   allowedStatuses,
 };

@@ -6,7 +6,7 @@
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("node:path");
 const { dashboardData, renderDashboard } = require("../src/dashboard");
-const { openDatabase, getStats, seedSampleData, createApplication, allowedStatuses } = require("../src/db");
+const { openDatabase, getStats, seedSampleData, createApplication, listApplications, allowedStatuses } = require("../src/db");
 
 let dbHandle = null;
 
@@ -58,6 +58,12 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("get-allowed-statuses", async () => allowedStatuses);
+
+  ipcMain.handle("list-applications", async () => {
+    if (!dbHandle) return [];
+    const rows = await listApplications(dbHandle, "better-sqlite3");
+    return rows;
+  });
 
   createWindow();
 

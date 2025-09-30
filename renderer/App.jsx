@@ -4,6 +4,7 @@ export default function App() {
   const [stats, setStats] = useState({ applications: 0, contacts: 0, activities: 0 })
   const [showForm, setShowForm] = useState(false)
   const [notice, setNotice] = useState(null)
+  const [page, setPage] = useState('dashboard') // 'dashboard' | 'applications'
 
   useEffect(() => {
     const api = window.api
@@ -14,22 +15,13 @@ export default function App() {
 
   return (
     <div className="container">
-      <header>
-        <h1>Application Tracker Dashboard</h1>
-        <p>Quick KPIs from the local SQLite database.</p>
-        <div style={{ marginTop: 12 }}>
-          <button onClick={() => setShowForm(v => !v)}>{showForm ? 'Close' : 'Add New Application'}</button>
-        </div>
-        {notice && <p style={{ color: 'green' }}>{notice}</p>}
-      </header>
-      <section className="cards">
-        <Card label="Applications" value={stats.applications} />
-        <Card label="Contacts" value={stats.contacts} />
-        <Card label="Activities" value={stats.activities} />
-      </section>
-      {showForm && (
-        <section style={{ marginTop: 20 }}>
-          <AddApplicationForm onCreated={async () => {
+      {page === 'dashboard' ? (
+        <DashboardView
+          stats={stats}
+          showForm={showForm}
+          setShowForm={setShowForm}
+          notice={notice}
+          onCreated={async () => {
             setShowForm(false)
             setNotice('Application created successfully')
             setTimeout(() => setNotice(null), 2500)
@@ -38,8 +30,11 @@ export default function App() {
               const s = await api.getStats()
               setStats(s)
             }
-          }} />
-        </section>
+          }}
+          onGoToApplications={() => setPage('applications')}
+        />
+      ) : (
+        <ApplicationsPage onBack={() => setPage('dashboard')} />
       )}
     </div>
   )
@@ -50,6 +45,100 @@ function Card({ label, value }) {
     <div className="card">
       <div>{label}</div>
       <div className="kpi">{String(value)}</div>
+    </div>
+  )
+}
+
+function DashboardView({ stats, showForm, setShowForm, notice, onCreated, onGoToApplications }) {
+  return (
+    <>
+      <header>
+        <h1>Application Tracker Dashboard</h1>
+        <p>Quick KPIs from the local SQLite database.</p>
+        <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
+          <button onClick={() => setShowForm(v => !v)}>{showForm ? 'Close' : 'Add New Application'}</button>
+          <button onClick={onGoToApplications}>View Applications</button>
+        </div>
+        {notice && <p style={{ color: 'green' }}>{notice}</p>}
+      </header>
+      <section className="cards">
+        <Card label="Applications" value={stats.applications} />
+        <Card label="Contacts" value={stats.contacts} />
+        <Card label="Activities" value={stats.activities} />
+      </section>
+      {showForm && (
+        <section style={{ marginTop: 20 }}>
+          <AddApplicationForm onCreated={onCreated} />
+        </section>
+      )}
+    </>
+  )
+}
+
+function ApplicationsPage({ onBack }) {
+  const [apps, setApps] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+
+  useEffect(() => {
+    let mounted = true
+    async function load() {
+      try {
+        const rows = await (window.api?.listApplications?.() || Promise.resolve([]))
+        if (mounted) setApps(rows)
+      } catch (e) {
+        if (mounted) setError(e?.message || String(e))
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+    load()
+    return () => { mounted = false }
+  }, [])
+
+  return (
+    <div>
+      <header>
+        <h1>Applications</h1>
+        <p>All job applications in the database.</p>
+        <div style={{ marginTop: 12 }}>
+          <button onClick={onBack}>Back to Dashboard</button>
+        </div>
+      </header>
+      {loading && <p>Loading…</p>}
+      {error && <p style={{ color: 'crimson' }}>{error}</p>}
+      {!loading && !error && (
+        apps.length === 0 ? (
+          <p>No applications yet.</p>
+        ) : (
+          <table className="table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Company</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th>URL</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {apps.map(a => (
+                <tr key={a.id}>
+                  <td>{a.id}</td>
+                  <td>{a.company}</td>
+                  <td>{a.role || ''}</td>
+                  <td>{a.status}</td>
+                  <td>
+                    {a.url ? <a href={a.url} target="_blank" rel="noreferrer">link</a> : ''}
+                  </td>
+                  <td>{new Date(a.created_at).toLocaleString()}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )
+      )}
     </div>
   )
 }
