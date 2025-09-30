@@ -43,7 +43,7 @@ export default function App() {
 function Card({ label, value }) {
   return (
     <div className="card">
-      <div>{label}</div>
+      <div className="kpi-label">{label}</div>
       <div className="kpi">{String(value)}</div>
     </div>
   )
@@ -55,13 +55,13 @@ function DashboardView({ stats, showForm, setShowForm, notice, onCreated, onGoTo
       <header>
         <h1>Application Tracker Dashboard</h1>
         <p>Quick KPIs from the local SQLite database.</p>
-        <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
-          <button onClick={() => setShowForm(v => !v)}>{showForm ? 'Close' : 'Add New Application'}</button>
-          <button onClick={onGoToApplications}>View Applications</button>
+        <div className="actions">
+          <button className="btn btn-primary" onClick={() => setShowForm(v => !v)}>{showForm ? 'Close' : 'Add New Application'}</button>
+          <button className="btn btn-ghost" onClick={onGoToApplications}>View Applications</button>
         </div>
-        {notice && <p style={{ color: 'green' }}>{notice}</p>}
+        {notice && <p className="notice">{notice}</p>}
       </header>
-      <section className="cards">
+      <section className="kpi-grid">
         <Card label="Applications" value={stats.applications} />
         <Card label="Contacts" value={stats.contacts} />
         <Card label="Activities" value={stats.activities} />
@@ -101,8 +101,8 @@ function ApplicationsPage({ onBack }) {
       <header>
         <h1>Applications</h1>
         <p>All job applications in the database.</p>
-        <div style={{ marginTop: 12 }}>
-          <button onClick={onBack}>Back to Dashboard</button>
+        <div className="actions">
+          <button className="btn btn-ghost" onClick={onBack}>Back to Dashboard</button>
         </div>
       </header>
       {loading && <p>Loading…</p>}
@@ -111,32 +111,37 @@ function ApplicationsPage({ onBack }) {
         apps.length === 0 ? (
           <p>No applications yet.</p>
         ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Company</th>
-                <th>Role</th>
-                <th>Status</th>
-                <th>URL</th>
-                <th>Created</th>
-              </tr>
-            </thead>
-            <tbody>
-              {apps.map(a => (
-                <tr key={a.id}>
-                  <td>{a.id}</td>
-                  <td>{a.company}</td>
-                  <td>{a.role || ''}</td>
-                  <td>{a.status}</td>
-                  <td>
-                    {a.url ? <a href={a.url} target="_blank" rel="noreferrer">link</a> : ''}
-                  </td>
-                  <td>{new Date(a.created_at).toLocaleString()}</td>
+          <div className="panel">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Company</th>
+                  <th>Role</th>
+                  <th>Status</th>
+                  <th>URL</th>
+                  <th>Created</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {apps.map(a => {
+                  const statusKey = String(a.status || '').replace(' ', '-')
+                  return (
+                    <tr key={a.id}>
+                      <td>{a.id}</td>
+                      <td>{a.company}</td>
+                      <td>{a.role || ''}</td>
+                      <td><span className={`badge status-${statusKey}`}>{a.status}</span></td>
+                      <td>
+                        {a.url ? <a className="link" href={a.url} target="_blank" rel="noreferrer">link</a> : ''}
+                      </td>
+                      <td>{new Date(a.created_at).toLocaleString()}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         )
       )}
     </div>
