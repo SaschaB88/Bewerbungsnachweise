@@ -145,3 +145,15 @@ test("updateApplication updates fields and validates via fake db", () => {
   // empty company when provided
   assert.throws(() => updateApplication(db, "better-sqlite3", a.id, { company: "" }));
 });
+
+test("createApplication rejects invalid URL", () => {
+  const db = makeFakeDb();
+  assert.throws(() => createApplication(db, "better-sqlite3", { company: "A", status: allowedStatuses[0], url: "notaurl" }));
+  assert.throws(() => createApplication(db, "better-sqlite3", { company: "A", status: allowedStatuses[0], url: "ftp://example.com" }));
+});
+
+test("updateApplication rejects invalid URL", () => {
+  const db = makeFakeDb();
+  const a = createApplication(db, "better-sqlite3", { company: "A", status: allowedStatuses[0] });
+  assert.throws(() => updateApplication(db, "better-sqlite3", a.id, { url: "invalid" }));
+});

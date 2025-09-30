@@ -13,6 +13,16 @@ const allowedStatuses = [
   "On Hold",
 ];
 
+function isValidHttpUrl(u) {
+  if (!u) return false;
+  try {
+    const parsed = new URL(u);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 function resolveDbPath(preferredPath) {
   if (preferredPath) {
     const dir = path.dirname(preferredPath);
@@ -143,6 +153,10 @@ function createApplication(db, driverType = "better-sqlite3", input = {}) {
   const url = (input.url || "").trim() || null;
   const notes = (input.notes || "").trim() || null;
 
+  if (url && !isValidHttpUrl(url)) {
+    throw new Error("Invalid URL: must start with http(s) and be absolute");
+  }
+
   if (driverType === "better-sqlite3") {
     const stmt = db.prepare(
       "INSERT INTO applications(company, role, status, url, notes) VALUES(?,?,?,?,?)"
@@ -223,6 +237,9 @@ function updateApplication(db, driverType = "better-sqlite3", id, patch = {}) {
   }
   if (Object.prototype.hasOwnProperty.call(patch, "url")) {
     const url = (patch.url || "").trim();
+    if (url && !isValidHttpUrl(url)) {
+      throw new Error("Invalid URL: must start with http(s) and be absolute");
+    }
     fields.url = url || null;
   }
   if (Object.prototype.hasOwnProperty.call(patch, "notes")) {
@@ -296,6 +313,7 @@ module.exports = {
   listApplications,
   deleteApplication,
   updateApplication,
+  isValidHttpUrl,
   getApplicationFull,
   allowedStatuses,
 };

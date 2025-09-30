@@ -8,9 +8,15 @@ export default function App() {
 
   useEffect(() => {
     const api = window.api
-    if (api && api.getStats) {
-      api.getStats().then(setStats).catch(() => {})
+    const refreshStats = async () => {
+      if (api && api.getStats) {
+        try { const s = await api.getStats(); setStats(s) } catch {}
+      }
     }
+    refreshStats()
+    const onStatsChanged = () => { refreshStats() }
+    window.addEventListener('statsChanged', onStatsChanged)
+    return () => window.removeEventListener('statsChanged', onStatsChanged)
   }, [])
 
   return (
@@ -41,6 +47,8 @@ export default function App() {
                   const s = await api.getStats()
                   setStats(s)
                 }
+                // notify other views
+                window.dispatchEvent(new Event('statsChanged'))
               }}
               onGoToApplications={() => setPage('applications')}
             />
@@ -245,6 +253,8 @@ function ApplicationsPage({ onBack }) {
                     setApps(prev => prev.filter(x => x.id !== confirmItem.id))
                     setNotice('Application deleted')
                     setTimeout(() => setNotice(null), 2000)
+                    // Notify dashboard to refresh KPIs
+                    try { window.dispatchEvent(new Event('statsChanged')) } catch {}
                     // Reset focus state after deletion
                     try { document.activeElement && document.activeElement.blur() } catch {}
                     try { await window.api.focusWindow?.() } catch {}
@@ -305,6 +315,14 @@ function AddApplicationForm({ onCreated }) {
   const [submitting, setSubmitting] = useState(false)
   const companyRef = React.useRef(null)
 
+  function isValidHttpUrl(u) {
+    if (!u) return false
+    try {
+      const parsed = new URL(u)
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+    } catch { return false }
+  }
+
   useEffect(() => {
     const api = window.api
     if (api && api.getAllowedStatuses) {
@@ -333,6 +351,10 @@ function AddApplicationForm({ onCreated }) {
       setError("Invalid status selected")
       return
     }
+    if (form.url && form.url.trim() && !isValidHttpUrl(form.url.trim())) {
+      setError("Bitte eine gültige URL angeben (http/https)")
+      return
+    }
     try {
       setSubmitting(true)
       await window.api.createApplication({
@@ -342,6 +364,7 @@ function AddApplicationForm({ onCreated }) {
         url: form.url || undefined,
         notes: form.notes || undefined,
       })
+      try { window.dispatchEvent(new Event('statsChanged')) } catch {}
       setForm({ company: '', role: '', status: 'Planned', url: '', notes: '' })
       onCreated && onCreated()
     } catch (err) {
@@ -374,7 +397,7 @@ function AddApplicationForm({ onCreated }) {
         </div>
         <div className="form-row">
           <label>URL</label>
-          <input placeholder="https://..." name="url" value={form.url} onChange={onChange} />
+          <input type="url" placeholder="https://..." name="url" value={form.url} onChange={onChange} pattern="https?://.*" title="Gültige URL beginnend mit http:// oder https://" />
         </div>
         <div className="form-row full">
           <label>Notes</label>
@@ -404,6 +427,14 @@ function EditApplicationForm({ item, onCancel, onSaved }) {
   const [submitting, setSubmitting] = useState(false)
   const companyRef = React.useRef(null)
 
+  function isValidHttpUrl(u) {
+    if (!u) return false
+    try {
+      const parsed = new URL(u)
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+    } catch { return false }
+  }
+
   useEffect(() => {
     const api = window.api
     if (api && api.getAllowedStatuses) {
@@ -431,6 +462,10 @@ function EditApplicationForm({ item, onCancel, onSaved }) {
       setError("Invalid status selected")
       return
     }
+    if (form.url && form.url.trim() && !isValidHttpUrl(form.url.trim())) {
+      setError("Bitte eine gültige URL angeben (http/https)")
+      return
+    }
     try {
       setSubmitting(true)
       await window.api.updateApplication({
@@ -441,6 +476,7 @@ function EditApplicationForm({ item, onCancel, onSaved }) {
         url: form.url || undefined,
         notes: form.notes || undefined,
       })
+      try { window.dispatchEvent(new Event('statsChanged')) } catch {}
       onSaved && onSaved()
     } catch (err) {
       setError(err?.message || String(err))
