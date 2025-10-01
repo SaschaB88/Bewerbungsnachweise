@@ -4,14 +4,29 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const allowedStatuses = [
-  "Planned",
-  "Applied",
-  "Interviewing",
-  "Offer",
-  "Hired",
-  "Rejected",
-  "On Hold",
+  "Geplant",
+  "Beworben",
+  "Vorstellungsgespräch",
+  "Angebot",
+  "Eingestellt",
+  "Abgelehnt",
+  "Zurückgestellt"
 ];
+
+const statusMigrationMap = new Map([
+  ["Planned", "Geplant"],
+  ["Applied", "Beworben"],
+  ["Interviewing", "Vorstellungsgespräch"],
+  ["VorstellungsgesprÃ¤ch", "Vorstellungsgespräch"],
+  ["VorstellungsgesprÃ�ch", "Vorstellungsgespräch"],
+  ["VorstellungsgesprÃch", "Vorstellungsgespräch"],
+  ["Offer", "Angebot"],
+  ["Hired", "Eingestellt"],
+  ["Rejected", "Abgelehnt"],
+  ["On Hold", "Zurückgestellt"],
+  ["ZurÃ¼ckgestellt", "Zurückgestellt"],
+  ["ZurÃckgestellt", "Zurückgestellt"],
+]);
 
 function isValidHttpUrl(u) {
   if (!u) return false;
@@ -81,13 +96,62 @@ function openDatabase(options = {}) {
   return db;
 }
 
+
+function maybeMigrateApplicationStatuses(db, schema) {
+  if (!schema) return;
+  let tableSql = null;
+  try {
+    const row = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='applications'").get();
+    tableSql = row && typeof row.sql === "string" ? row.sql : null;
+  } catch {
+    return;
+  }
+  if (!tableSql) return;
+  const needsEnglishMigration = tableSql.includes("'Planned'") && !tableSql.includes("'Geplant'");
+  const needsUtfFix = tableSql.includes("'VorstellungsgesprÃ¤ch'") || tableSql.includes("'VorstellungsgesprÃ�ch'") || tableSql.includes("'VorstellungsgesprÃch'") || tableSql.includes("'ZurÃ¼ckgestellt'") || tableSql.includes("'ZurÃckgestellt'");
+  if (!needsEnglishMigration && !needsUtfFix) return;
+
+  const match = schema.match(/CREATE TABLE IF NOT EXISTS applications\s*\([\s\S]*?\);/);
+  if (!match) return;
+  const createSql = match[0].replace('IF NOT EXISTS ', '');
+
+  const previousForeignKeys = db.pragma('foreign_keys', { simple: true });
+  db.pragma('foreign_keys = OFF');
+  db.exec('BEGIN TRANSACTION;');
+  try {
+    db.exec('ALTER TABLE applications RENAME TO applications_old;');
+    db.exec(createSql);
+    const selectStmt = db.prepare('SELECT id, company, role, status, url, notes, created_at FROM applications_old ORDER BY id');
+    const rows = selectStmt.all();
+    const insertStmt = db.prepare('INSERT INTO applications(id, company, role, status, url, notes, created_at) VALUES (?,?,?,?,?,?,?)');
+    const insertMany = db.transaction((items) => {
+      for (const row of items) {
+        const nextStatus = statusMigrationMap.get(row.status) || row.status;
+        insertStmt.run(row.id, row.company, row.role, nextStatus, row.url, row.notes, row.created_at);
+      }
+    });
+    insertMany(rows);
+    db.exec('DROP TABLE applications_old;');
+    db.exec('COMMIT;');
+  } catch (err) {
+    db.exec('ROLLBACK;');
+    try { db.exec('ALTER TABLE applications_old RENAME TO applications;'); } catch {}
+    throw err;
+  } finally {
+    const pragmaValue = previousForeignKeys ? 'ON' : 'OFF';
+    db.pragma(`foreign_keys = ${pragmaValue}`);
+  }
+}
+
 function migrate(db, driverType) {
   const schema = readSchema();
   if (driverType === "better-sqlite3") {
+    maybeMigrateApplicationStatuses(db, schema);
     db.exec(schema);
     return;
   }
 }
+
 
 function seedSampleData(db, driverType = "better-sqlite3") {
   // Simple idempotent seed: insert a sample application if none exists
@@ -100,7 +164,7 @@ function seedSampleData(db, driverType = "better-sqlite3") {
       const appId = insertApp.run(
         "OpenAI",
         "Software Engineer",
-        "Applied",
+        "Beworben",
         "https://openai.com/careers",
         "Exciting opportunity"
       ).lastInsertRowid;
@@ -146,7 +210,7 @@ function createApplication(db, driverType = "better-sqlite3", input = {}) {
   const company = (input.company || "").trim();
   if (!company) throw new Error("'company' is required");
   const role = (input.role || "").trim() || null;
-  let status = (input.status || "Planned").trim();
+  let status = (input.status || "Geplant").trim();
   if (!allowedStatuses.includes(status)) {
     throw new Error(`Invalid status '${status}'. Allowed: ${allowedStatuses.join(", ")}`);
   }
@@ -317,3 +381,4 @@ module.exports = {
   getApplicationFull,
   allowedStatuses,
 };
+

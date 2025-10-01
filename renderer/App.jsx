@@ -40,7 +40,7 @@ export default function App() {
               notice={notice}
               onCreated={async () => {
                 setShowForm(false)
-                setNotice('Application created successfully')
+                setNotice('Bewerbung erfolgreich erstellt')
                 setTimeout(() => setNotice(null), 2500)
                 const api = window.api
                 if (api && api.getStats) {
@@ -81,18 +81,18 @@ function DashboardView({ stats, showForm, setShowForm, notice, onCreated, onGoTo
   return (
     <>
       <header>
-        <h1>Application Tracker Dashboard</h1>
-        <p>Quick KPIs from the local SQLite database.</p>
+        <h1>Dein Dashboard</h1>
+        <p>Deine Leistungskennzahlen:</p>
         <div className="actions">
-          <button className="btn btn-primary" onClick={() => setShowForm(v => !v)}>{showForm ? 'Close' : 'Add New Application'}</button>
-          <button className="btn btn-ghost" onClick={onGoToApplications}>View Applications</button>
+          <button className="btn btn-primary" onClick={() => setShowForm(v => !v)}>{showForm ? 'Schließen' : 'Bewerbung eintragen'}</button>
+          <button className="btn btn-ghost" onClick={onGoToApplications}>Bewerbungen anzeigen</button>
         </div>
         {notice && <p className="notice">{notice}</p>}
       </header>
       <section className="kpi-grid">
-        <Card label="Applications" value={stats.applications} />
-        <Card label="Contacts" value={stats.contacts} />
-        <Card label="Activities" value={stats.activities} />
+        <Card label="Bewerbungen" value={stats.applications} />
+        <Card label="Kontakte" value={stats.contacts} />
+        <Card label="Aktivitäten" value={stats.activities} />
       </section>
       {showForm && (
         <section style={{ marginTop: 20 }}>
@@ -140,8 +140,8 @@ function ApplicationsPage({ onBack }) {
             try { await window.api.focusWindow?.() } catch {}
             setShowForm(v => !v)
             setTimeout(() => { window.dispatchEvent(new Event('hardFocusReset')) }, 10)
-          }}>{showForm ? 'Close' : 'Add New Application'}</button>
-          <button className="btn btn-ghost" onClick={onBack}>Back to Dashboard</button>
+          }}>{showForm ? 'Schließen' : 'Bewerbung eintragen'}</button>
+          <button className="btn btn-ghost" onClick={onBack}>Zurück zum Dashboard</button>
         </div>
       </header>
       {notice && <p className="notice">{notice}</p>}
@@ -149,7 +149,7 @@ function ApplicationsPage({ onBack }) {
         <div className="panel" style={{ marginBottom: 16 }}>
           <AddApplicationForm onCreated={async () => {
             setShowForm(false)
-            setNotice('Application created successfully')
+            setNotice('Bewerbung erfolgreich erstellt')
             setTimeout(() => setNotice(null), 2500)
             try {
               const rows = await (window.api?.listApplications?.() || Promise.resolve([]))
@@ -158,23 +158,23 @@ function ApplicationsPage({ onBack }) {
           }} />
         </div>
       )}
-      {loading && <p>Loading…</p>}
+  {loading && <p>Lade…</p>}
       {error && <p style={{ color: 'crimson' }}>{error}</p>}
       {!loading && !error && (
         apps.length === 0 ? (
-          <p>No applications yet.</p>
+          <p>Keine Bewerbungen vorhanden.</p>
         ) : (
           <div className="panel">
             <table className="table">
               <thead>
                 <tr>
                   <th>ID</th>
-                  <th>Company</th>
-                  <th>Role</th>
+                  <th>Unternehmen</th>
+                  <th>Rolle</th>
                   <th>Status</th>
                   <th>URL</th>
-                  <th>Created</th>
-                  <th>Actions</th>
+                  <th>Erstellt</th>
+                  <th>Aktionen</th>
                 </tr>
               </thead>
               <tbody>
@@ -196,7 +196,7 @@ function ApplicationsPage({ onBack }) {
                       <td>{a.role || ''}</td>
                       <td><span className={`badge status-${statusKey}`}>{a.status}</span></td>
                       <td>
-                        {a.url ? <a className="link" href={a.url} target="_blank" rel="noreferrer">link</a> : ''}
+                        {a.url ? <a className="link" href={a.url} target="_blank" rel="noreferrer">Link</a> : ''}
                       </td>
                       <td>{new Date(a.created_at).toLocaleString()}</td>
                       <td>
@@ -204,11 +204,11 @@ function ApplicationsPage({ onBack }) {
                           <button
                             className="btn"
                             onClick={(e) => { e.stopPropagation(); setEditItem(a); }}
-                          >Edit</button>
+                          >Bearbeiten</button>
                           <button
                             className="btn btn-danger"
                             onClick={(e) => { e.stopPropagation(); setConfirmItem(a) }}
-                          >Delete</button>
+                          >Löschen</button>
                         </div>
                       </td>
                     </tr>
@@ -226,7 +226,7 @@ function ApplicationsPage({ onBack }) {
             onCancel={() => setEditItem(null)}
             onSaved={async () => {
               setEditItem(null)
-              setNotice('Application updated')
+              setNotice('Bewerbung aktualisiert')
               setTimeout(() => setNotice(null), 2500)
               try {
                 const rows = await (window.api?.listApplications?.() || Promise.resolve([]))
@@ -251,7 +251,7 @@ function ApplicationsPage({ onBack }) {
                     await window.api.deleteApplication(confirmItem.id)
                     setConfirmItem(null)
                     setApps(prev => prev.filter(x => x.id !== confirmItem.id))
-                    setNotice('Application deleted')
+                    setNotice('Bewerbung gelöscht')
                     setTimeout(() => setNotice(null), 2000)
                     // Notify dashboard to refresh KPIs
                     try { window.dispatchEvent(new Event('statsChanged')) } catch {}
@@ -302,12 +302,12 @@ function ActionsPage() {
 
 function AddApplicationForm({ onCreated }) {
   const [allowed, setAllowed] = useState([
-    'Planned','Applied','Interviewing','Offer','Hired','Rejected','On Hold'
+    'Geplant','Beworben','Vorstellungsgespräch','Angebot','Eingestellt','Abgelehnt','Zurückgestellt'
   ])
   const [form, setForm] = useState({
     company: '',
     role: '',
-    status: 'Planned',
+    status: 'Geplant',
     url: '',
     notes: ''
   })
@@ -344,11 +344,11 @@ function AddApplicationForm({ onCreated }) {
     e.preventDefault()
     setError(null)
     if (!form.company.trim()) {
-      setError("Company is required")
+      setError("Unternehmen ist erforderlich")
       return
     }
     if (!allowed.includes(form.status)) {
-      setError("Invalid status selected")
+      setError("Ungültiger Status ausgewählt")
       return
     }
     if (form.url && form.url.trim() && !isValidHttpUrl(form.url.trim())) {
@@ -365,7 +365,7 @@ function AddApplicationForm({ onCreated }) {
         notes: form.notes || undefined,
       })
       try { window.dispatchEvent(new Event('statsChanged')) } catch {}
-      setForm({ company: '', role: '', status: 'Planned', url: '', notes: '' })
+      setForm({ company: '', role: '', status: 'Geplant', url: '', notes: '' })
       onCreated && onCreated()
     } catch (err) {
       setError(err?.message || String(err))
@@ -377,36 +377,36 @@ function AddApplicationForm({ onCreated }) {
   return (
     <form onSubmit={onSubmit}>
       <div className="panel-header">
-        <h2 className="panel-title">New Application</h2>
-        <p className="panel-subtitle">Provide details to add a job application.</p>
+        <h2 className="panel-title">Neue Bewerbung</h2>
+        <p className="panel-subtitle">Gib Details ein, um eine Bewerbung hinzuzufügen.</p>
       </div>
       <div className="form-grid">
         <div className="form-row">
-          <label>Company*</label>
-          <input ref={companyRef} placeholder="e.g., OpenAI" name="company" value={form.company} onChange={onChange} required />
+          <label>Unternehmen*:</label>
+          <input ref={companyRef} placeholder="z. B. OpenAI" name="company" value={form.company} onChange={onChange} required />
         </div>
         <div className="form-row">
-          <label>Role</label>
-          <input placeholder="e.g., Software Engineer" name="role" value={form.role} onChange={onChange} />
+          <label>Rolle*:</label>
+          <input placeholder="z. B. Software Engineer" name="role" value={form.role} onChange={onChange} required />
         </div>
         <div className="form-row">
-          <label>Status</label>
-          <select name="status" value={form.status} onChange={onChange}>
+          <label>Status*:</label>
+          <select name="status" value={form.status} onChange={onChange} required>
             {allowed.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
         <div className="form-row">
-          <label>URL</label>
+          <label>URL:</label>
           <input type="url" placeholder="https://..." name="url" value={form.url} onChange={onChange} pattern="https?://.*" title="Gültige URL beginnend mit http:// oder https://" />
         </div>
         <div className="form-row full">
-          <label>Notes</label>
-          <textarea placeholder="Optional notes" name="notes" value={form.notes} onChange={onChange} rows={4} />
+          <label>Notizen:</label>
+          <textarea placeholder="Optionale Notizen" name="notes" value={form.notes} onChange={onChange} rows={4} />
         </div>
       </div>
       <div className="form-actions">
         {error && <div className="form-error">{error}</div>}
-        <button className="btn btn-primary" type="submit" disabled={submitting}>{submitting ? 'Saving…' : 'Save Application'}</button>
+        <button className="btn btn-primary" type="submit" disabled={submitting}>{submitting ? 'Speichert…' : 'Bewerbung speichern'}</button>
       </div>
     </form>
   )
@@ -414,12 +414,12 @@ function AddApplicationForm({ onCreated }) {
 
 function EditApplicationForm({ item, onCancel, onSaved }) {
   const [allowed, setAllowed] = useState([
-    'Planned','Applied','Interviewing','Offer','Hired','Rejected','On Hold'
+    'Geplant','Beworben','Vorstellungsgespräch','Angebot','Eingestellt','Abgelehnt','Zurückgestellt'
   ])
   const [form, setForm] = useState({
     company: item.company || '',
     role: item.role || '',
-    status: item.status || 'Planned',
+    status: item.status || 'Geplant',
     url: item.url || '',
     notes: item.notes || ''
   })
@@ -455,11 +455,11 @@ function EditApplicationForm({ item, onCancel, onSaved }) {
     e.preventDefault()
     setError(null)
     if (!form.company.trim()) {
-      setError("Company is required")
+      setError("Unternehmen ist erforderlich")
       return
     }
     if (!allowed.includes(form.status)) {
-      setError("Invalid status selected")
+      setError("Ungültiger Status ausgewählt")
       return
     }
     if (form.url && form.url.trim() && !isValidHttpUrl(form.url.trim())) {
@@ -488,37 +488,37 @@ function EditApplicationForm({ item, onCancel, onSaved }) {
   return (
     <form onSubmit={onSubmit}>
       <div className="panel-header">
-        <h2 className="panel-title">Edit Application</h2>
-        <p className="panel-subtitle">Update fields and save changes.</p>
+        <h2 className="panel-title">Bewerbung bearbeiten</h2>
+        <p className="panel-subtitle">Felder aktualisieren und Änderungen speichern.</p>
       </div>
       <div className="form-grid">
         <div className="form-row">
-          <label>Company*</label>
+          <label>Unternehmen*:</label>
           <input ref={companyRef} name="company" value={form.company} onChange={onChange} required />
         </div>
         <div className="form-row">
-          <label>Role</label>
-          <input name="role" value={form.role} onChange={onChange} />
+          <label>Rolle*:</label>
+          <input name="role" value={form.role} onChange={onChange} required />
         </div>
         <div className="form-row">
-          <label>Status</label>
-          <select name="status" value={form.status} onChange={onChange}>
+          <label>Status*:</label>
+          <select name="status" value={form.status} onChange={onChange} required>
             {allowed.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </div>
         <div className="form-row">
-          <label>URL</label>
+          <label>URL:</label>
           <input name="url" value={form.url} onChange={onChange} />
         </div>
         <div className="form-row full">
-          <label>Notes</label>
+          <label>Notizen:</label>
           <textarea name="notes" value={form.notes} onChange={onChange} rows={4} />
         </div>
       </div>
       <div className="form-actions">
         {error && <div className="form-error">{error}</div>}
-        <button type="button" className="btn btn-ghost" onClick={onCancel} disabled={submitting}>Cancel</button>
-        <button className="btn btn-primary" type="submit" disabled={submitting}>{submitting ? 'Saving…' : 'Save Changes'}</button>
+        <button type="button" className="btn btn-ghost" onClick={onCancel} disabled={submitting}>Abbrechen</button>
+        <button className="btn btn-primary" type="submit" disabled={submitting}>{submitting ? 'Speichert…' : 'Änderungen speichern'}</button>
       </div>
     </form>
   )
