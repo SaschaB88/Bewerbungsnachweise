@@ -15,7 +15,7 @@ contextBridge.exposeInMainWorld("api", {
     try {
       return await ipcRenderer.invoke("get-allowed-statuses");
     } catch {
-      return ["Planned","Applied","Interviewing","Offer","Hired","Rejected","On Hold"];
+      return ["Geplant","Beworben","Vorstellungsgespräch","Angebot","Eingestellt","Abgelehnt","Zurückgestellt"];
     }
   },
   createApplication: async (payload) => {

@@ -141,13 +141,13 @@ label { color: var(--muted); font-size: 13px; }
 button, input, select, textarea, a { pointer-events: auto; }
 
 .badge { display: inline-block; padding: 4px 8px; border-radius: 999px; font-size: 12px; border: 1px solid var(--border); background: var(--surface); }
-.status-Planned { color: var(--muted); }
-.status-Applied { background: rgba(110,168,254,0.18); border-color: rgba(110,168,254,0.35); color: #bcd7ff; }
-.status-Interviewing { background: rgba(155,140,255,0.18); border-color: rgba(155,140,255,0.35); color: #d5ceff; }
-.status-Offer { background: rgba(69,212,131,0.18); border-color: rgba(69,212,131,0.35); color: #c7f2dc; }
-.status-Hired { background: rgba(69,212,131,0.24); border-color: rgba(69,212,131,0.45); color: #d9f7e8; font-weight: 600; }
-.status-Rejected { background: rgba(255,107,107,0.18); border-color: rgba(255,107,107,0.35); color: #ffd3d3; }
-.status-On\ Hold { background: rgba(247,185,85,0.18); border-color: rgba(247,185,85,0.35); color: #ffe6c7; }
+.status-Geplant { color: var(--muted); }
+.status-Beworben { background: rgba(110,168,254,0.18); border-color: rgba(110,168,254,0.35); color: #bcd7ff; }
+.status-Vorstellungsgespräch { background: rgba(155,140,255,0.18); border-color: rgba(155,140,255,0.35); color: #d5ceff; }
+.status-Angebot { background: rgba(69,212,131,0.18); border-color: rgba(69,212,131,0.35); color: #c7f2dc; }
+.status-Eingestellt { background: rgba(69,212,131,0.24); border-color: rgba(69,212,131,0.45); color: #d9f7e8; font-weight: 600; }
+.status-Abgelehnt { background: rgba(255,107,107,0.18); border-color: rgba(255,107,107,0.35); color: #ffd3d3; }
+.status-Zurückgestellt { background: rgba(247,185,85,0.18); border-color: rgba(247,185,85,0.35); color: #ffe6c7; }
 
 .link { color: var(--accent); text-decoration: none; }
 .link:hover { text-decoration: underline; }

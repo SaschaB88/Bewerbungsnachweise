@@ -302,12 +302,12 @@ function ActionsPage() {
 
 function AddApplicationForm({ onCreated }) {
   const [allowed, setAllowed] = useState([
-    'Planned','Applied','Interviewing','Offer','Hired','Rejected','On Hold'
+    'Geplant','Beworben','Vorstellungsgespräch','Angebot','Eingestellt','Abgelehnt','Zurückgestellt'
   ])
   const [form, setForm] = useState({
     company: '',
     role: '',
-    status: 'Planned',
+    status: 'Geplant',
     url: '',
     notes: ''
   })
@@ -365,7 +365,7 @@ function AddApplicationForm({ onCreated }) {
         notes: form.notes || undefined,
       })
       try { window.dispatchEvent(new Event('statsChanged')) } catch {}
-      setForm({ company: '', role: '', status: 'Planned', url: '', notes: '' })
+      setForm({ company: '', role: '', status: 'Geplant', url: '', notes: '' })
       onCreated && onCreated()
     } catch (err) {
       setError(err?.message || String(err))
@@ -414,12 +414,12 @@ function AddApplicationForm({ onCreated }) {
 
 function EditApplicationForm({ item, onCancel, onSaved }) {
   const [allowed, setAllowed] = useState([
-    'Planned','Applied','Interviewing','Offer','Hired','Rejected','On Hold'
+    'Geplant','Beworben','Vorstellungsgespräch','Angebot','Eingestellt','Abgelehnt','Zurückgestellt'
   ])
   const [form, setForm] = useState({
     company: item.company || '',
     role: item.role || '',
-    status: item.status || 'Planned',
+    status: item.status || 'Geplant',
     url: item.url || '',
     notes: item.notes || ''
   })

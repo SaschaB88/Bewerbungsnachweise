@@ -57,7 +57,7 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("create-application", async (_evt, payload) => {
-    if (!dbHandle) throw new Error("Database not initialized");
+    if (!dbHandle) throw new Error("Datenbank nicht initialisiert");
     const res = await createApplication(dbHandle, "better-sqlite3", payload || {});
     return res;
   });
@@ -71,13 +71,13 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("delete-application", async (_evt, id) => {
-    if (!dbHandle) throw new Error("Database not initialized");
+    if (!dbHandle) throw new Error("Datenbank nicht initialisiert");
     const res = await deleteApplication(dbHandle, "better-sqlite3", id);
     return res;
   });
 
   ipcMain.handle("update-application", async (_evt, payload) => {
-    if (!dbHandle) throw new Error("Database not initialized");
+    if (!dbHandle) throw new Error("Datenbank nicht initialisiert");
     if (!payload || typeof payload.id === 'undefined') throw new Error("Missing id");
     const { id, ...patch } = payload;
     const res = await updateApplication(dbHandle, "better-sqlite3", id, patch);
@@ -85,7 +85,7 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("get-application-full", async (_evt, id) => {
-    if (!dbHandle) throw new Error("Database not initialized");
+    if (!dbHandle) throw new Error("Datenbank nicht initialisiert");
     const res = await getApplicationFull(dbHandle, "better-sqlite3", id);
     return res;
   });

@@ -6,8 +6,8 @@ CREATE TABLE IF NOT EXISTS applications (
   company TEXT NOT NULL,
   role TEXT,
   status TEXT CHECK (status IN (
-    'Planned','Applied','Interviewing','Offer','Hired','Rejected','On Hold'
-  )) DEFAULT 'Planned',
+    'Geplant','Beworben','VorstellungsgesprÃ¤ch','Angebot','Eingestellt','Abgelehnt','ZurÃ¼ckgestellt'
+  )) DEFAULT 'Geplant',
   url TEXT,
   notes TEXT,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP
