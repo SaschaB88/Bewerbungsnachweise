@@ -6,7 +6,7 @@ CREATE TABLE IF NOT EXISTS applications (
   company TEXT NOT NULL,
   role TEXT,
   status TEXT CHECK (status IN (
-    'Geplant','Beworben','VorstellungsgesprÃ¤ch','Angebot','Eingestellt','Abgelehnt','ZurÃ¼ckgestellt'
+    'Geplant','Beworben','Vorstellungsgespräch','Angebot','Eingestellt','Abgelehnt','Zurückgestellt'
   )) DEFAULT 'Geplant',
   url TEXT,
   notes TEXT,

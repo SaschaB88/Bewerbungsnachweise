@@ -6,21 +6,26 @@ const path = require("node:path");
 const allowedStatuses = [
   "Geplant",
   "Beworben",
-  "VorstellungsgesprÃ¤ch",
+  "Vorstellungsgespräch",
   "Angebot",
   "Eingestellt",
   "Abgelehnt",
-  "ZurÃ¼ckgestellt"
+  "Zurückgestellt"
 ];
 
 const statusMigrationMap = new Map([
   ["Planned", "Geplant"],
   ["Applied", "Beworben"],
-  ["Interviewing", "VorstellungsgesprÃ¤ch"],
+  ["Interviewing", "Vorstellungsgespräch"],
+  ["VorstellungsgesprÃ¤ch", "Vorstellungsgespräch"],
+  ["VorstellungsgesprÃ�ch", "Vorstellungsgespräch"],
+  ["VorstellungsgesprÃch", "Vorstellungsgespräch"],
   ["Offer", "Angebot"],
   ["Hired", "Eingestellt"],
   ["Rejected", "Abgelehnt"],
-  ["On Hold", "ZurÃ¼ckgestellt"],
+  ["On Hold", "Zurückgestellt"],
+  ["ZurÃ¼ckgestellt", "Zurückgestellt"],
+  ["ZurÃckgestellt", "Zurückgestellt"],
 ]);
 
 function isValidHttpUrl(u) {
@@ -102,8 +107,9 @@ function maybeMigrateApplicationStatuses(db, schema) {
     return;
   }
   if (!tableSql) return;
-  if (!tableSql.includes("'Planned'")) return;
-  if (tableSql.includes("'Geplant'")) return;
+  const needsEnglishMigration = tableSql.includes("'Planned'") && !tableSql.includes("'Geplant'");
+  const needsUtfFix = tableSql.includes("'VorstellungsgesprÃ¤ch'") || tableSql.includes("'VorstellungsgesprÃ�ch'") || tableSql.includes("'VorstellungsgesprÃch'") || tableSql.includes("'ZurÃ¼ckgestellt'") || tableSql.includes("'ZurÃckgestellt'");
+  if (!needsEnglishMigration && !needsUtfFix) return;
 
   const match = schema.match(/CREATE TABLE IF NOT EXISTS applications\s*\([\s\S]*?\);/);
   if (!match) return;
