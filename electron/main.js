@@ -6,7 +6,7 @@
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("node:path");
 const { dashboardData, renderDashboard } = require("../src/dashboard");
-const { openDatabase, getStats, seedSampleData, createApplication, listApplications, deleteApplication, updateApplication, getApplicationFull, allowedStatuses } = require("../src/db");
+const { openDatabase, getStats, seedSampleData, createApplication, listApplications, deleteApplication, updateApplication, listContacts, createContact, updateContact, deleteContact, getApplicationFull, allowedStatuses } = require("../src/db");
 
 let dbHandle = null;
 
@@ -68,6 +68,31 @@ app.whenReady().then(() => {
     if (!dbHandle) return [];
     const rows = await listApplications(dbHandle, "better-sqlite3");
     return rows;
+  });
+
+  ipcMain.handle("list-contacts", async () => {
+    if (!dbHandle) return [];
+    return await listContacts(dbHandle, "better-sqlite3");
+  });
+
+  ipcMain.handle("create-contact", async (_evt, payload) => {
+    if (!dbHandle) throw new Error("Datenbank nicht initialisiert");
+    const res = await createContact(dbHandle, "better-sqlite3", payload || {});
+    return res;
+  });
+
+  ipcMain.handle("update-contact", async (_evt, payload) => {
+    if (!dbHandle) throw new Error("Datenbank nicht initialisiert");
+    if (!payload || typeof payload.id === "undefined") throw new Error("Missing id");
+    const { id, ...patch } = payload;
+    const res = await updateContact(dbHandle, "better-sqlite3", id, patch);
+    return res;
+  });
+
+  ipcMain.handle("delete-contact", async (_evt, id) => {
+    if (!dbHandle) throw new Error("Datenbank nicht initialisiert");
+    const res = await deleteContact(dbHandle, "better-sqlite3", id);
+    return res;
   });
 
   ipcMain.handle("delete-application", async (_evt, id) => {
@@ -147,3 +172,6 @@ document.getElementById('closeBtn').addEventListener('click',()=>window.close())
   const dataUrl = "data:text/html;charset=UTF-8," + encodeURIComponent(html);
   win.loadURL(dataUrl);
 }
+
+
+

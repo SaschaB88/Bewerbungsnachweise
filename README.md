@@ -69,6 +69,9 @@ Start in console (fallback)
 Start Electron window (fallback HTML if no React build yet)
 - `npm run start:electron`
 
+Rebuild after Updates
+- `npx electron-rebuild -f -w better-sqlite3`
+
 Notes
 - Electron entry: `electron/main.js` (loads `dist/index.html` if present, else fallback HTML).
 - Fallback/boot logic: `src/boot.js`.

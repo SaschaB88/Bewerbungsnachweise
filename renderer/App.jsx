@@ -273,19 +273,523 @@ function ApplicationsPage({ onBack }) {
 }
 
 function ContactsPage() {
+  const [contacts, setContacts] = useState([])
+  const [applications, setApplications] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [notice, setNotice] = useState(null)
+  const [showForm, setShowForm] = useState(false)
+  const [editItem, setEditItem] = useState(null)
+  const [confirmItem, setConfirmItem] = useState(null)
+
+  const mountedRef = React.useRef(true)
+
+  const load = React.useCallback(async (withSpinner = false) => {
+    if (withSpinner) setLoading(true)
+    if (mountedRef.current) setError(null)
+    try {
+      const contactPromise = window.api?.listContacts?.() || Promise.resolve([])
+      const appPromise = window.api?.listApplications?.() || Promise.resolve([])
+      const [contactRows, appRows] = await Promise.all([contactPromise, appPromise])
+      if (!mountedRef.current) return
+      setContacts(contactRows)
+      setApplications(appRows)
+    } catch (err) {
+      if (mountedRef.current) setError(err?.message || String(err))
+    } finally {
+      if (withSpinner && mountedRef.current) setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    load(true)
+    const onStatsChanged = () => { load(false) }
+    window.addEventListener('statsChanged', onStatsChanged)
+    return () => {
+      mountedRef.current = false
+      window.removeEventListener('statsChanged', onStatsChanged)
+    }
+  }, [load])
+
+  const hasApplications = applications.length > 0
+
   return (
     <div>
       <header>
         <h1>Kontakte</h1>
-        <p>Verwalte Kontakte zu deinen Bewerbungen.</p>
+        <p>Verwalte Ansprechpartner zu deinen Bewerbungen.</p>
+        <div className="actions">
+          <button
+            className="btn btn-primary"
+            disabled={!hasApplications && !showForm}
+            onClick={async () => {
+              if (!hasApplications && !showForm) return
+              try { await window.api.focusWindow?.() } catch {}
+              setEditItem(null)
+              setShowForm(v => !v)
+              setTimeout(() => { window.dispatchEvent(new Event('hardFocusReset')) }, 10)
+            }}
+          >{showForm ? 'Schliessen' : 'Kontakt hinzufuegen'}</button>
+        </div>
+        {!hasApplications && (
+          <p className="notice" style={{ marginTop: 12 }}>Lege zuerst eine Bewerbung an, um Kontakte zu erfassen.</p>
+        )}
       </header>
-      <div className="panel">
-        <p>Diese Ansicht ist noch leer. Demnächst kannst du hier Kontakte hinzufügen und verwalten.</p>
-      </div>
+      {notice && <p className="notice">{notice}</p>}
+      {showForm && (
+        <div className="panel" style={{ marginBottom: 16 }}>
+          <AddContactForm
+            applications={applications}
+            onCreated={async () => {
+              setShowForm(false)
+              setNotice('Kontakt gespeichert')
+              setTimeout(() => setNotice(null), 2500)
+              await load(false)
+              try { window.dispatchEvent(new Event('statsChanged')) } catch {}
+            }}
+          />
+        </div>
+      )}
+      {loading && <p>Laedt...</p>}
+      {error && <p style={{ color: 'crimson' }}>{error}</p>}
+      {!loading && !error && (
+        contacts.length === 0 ? (
+          <p>Keine Kontakte gespeichert.</p>
+        ) : (
+          <div className="panel">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Unternehmen</th>
+                  <th>Position</th>
+                  <th>Email</th>
+                  <th>Telefon</th>
+                  <th>LinkedIn</th>
+                  <th>Erstellt</th>
+                  <th>Aktionen</th>
+                </tr>
+              </thead>
+              <tbody>
+                {contacts.map(c => {
+                  const companyLabel = c.application_company
+                    ? (c.application_role ? `${c.application_company} (${c.application_role})` : c.application_company)
+                    : '-'
+                  return (
+                    <tr key={c.id}>
+                      <td>{c.name}</td>
+                      <td>{companyLabel}</td>
+                      <td>{c.title || ''}</td>
+                      <td>
+                        {c.email ? (
+                          <a className="link" href={`mailto:${c.email}`}>{c.email}</a>
+                        ) : ''}
+                      </td>
+                      <td>{c.phone || ''}</td>
+                      <td>
+                        {c.linkedin ? (
+                          <a className="link" href={c.linkedin} target="_blank" rel="noreferrer">Profil</a>
+                        ) : ''}
+                      </td>
+                      <td>{c.created_at ? new Date(c.created_at).toLocaleString() : ''}</td>
+                      <td>
+                        <div className="actions">
+                          <button
+                            className="btn"
+                            onClick={() => {
+                              setShowForm(false)
+                              setEditItem(c)
+                              setTimeout(() => { window.dispatchEvent(new Event('hardFocusReset')) }, 10)
+                            }}
+                          >Bearbeiten</button>
+                          <button
+                            className="btn btn-danger"
+                            onClick={() => setConfirmItem(c)}
+                          >Loeschen</button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
+      )}
+      {editItem && (
+        <div className="panel" style={{ marginTop: 16 }}>
+          <EditContactForm
+            applications={applications}
+            item={editItem}
+            onCancel={() => setEditItem(null)}
+            onSaved={async () => {
+              setEditItem(null)
+              setNotice('Kontakt aktualisiert')
+              setTimeout(() => setNotice(null), 2500)
+              await load(false)
+              try { window.dispatchEvent(new Event('statsChanged')) } catch {}
+            }}
+          />
+        </div>
+      )}
+      {confirmItem && (
+        <div className="modal-backdrop" onClick={() => setConfirmItem(null)}>
+          <div className="modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true">
+            <h2>Kontakt loeschen?</h2>
+            <p>Moechtest du den Kontakt "{confirmItem.name}" wirklich loeschen? Diese Aktion kann nicht rueckgaengig gemacht werden.</p>
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => setConfirmItem(null)}>Abbrechen</button>
+              <button
+                className="btn btn-danger"
+                onClick={async () => {
+                  try {
+                    await window.api.deleteContact(confirmItem.id)
+                    setConfirmItem(null)
+                    setContacts(prev => prev.filter(x => x.id !== confirmItem.id))
+                    setNotice('Kontakt geloescht')
+                    setTimeout(() => setNotice(null), 2000)
+                    try { window.dispatchEvent(new Event('statsChanged')) } catch {}
+                    await load(false)
+                    try { await window.api.focusWindow?.() } catch {}
+                    try { document.activeElement && document.activeElement.blur() } catch {}
+                  } catch (e) {
+                    setError(e?.message || String(e))
+                  }
+                }}
+              >Loeschen</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
 
+function AddContactForm({ applications, onCreated }) {
+  const [form, setForm] = useState({
+    applicationId: applications.length ? String(applications[0].id) : '',
+    name: '',
+    title: '',
+    email: '',
+    phone: '',
+    linkedin: '',
+  })
+  const [error, setError] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
+  const nameRef = React.useRef(null)
+
+  function isValidHttpUrl(u) {
+    if (!u) return false
+    try {
+      const parsed = new URL(u)
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+    } catch { return false }
+  }
+
+  useEffect(() => {
+    setTimeout(() => { try { nameRef.current?.focus() } catch {} }, 0)
+    const onHardFocus = () => { try { nameRef.current?.focus() } catch {} }
+    window.addEventListener('hardFocusReset', onHardFocus)
+    return () => window.removeEventListener('hardFocusReset', onHardFocus)
+  }, [])
+
+  useEffect(() => {
+    if (!applications.length) return
+    setForm(prev => {
+      if (prev.applicationId) return prev
+      return { ...prev, applicationId: String(applications[0].id) }
+    })
+  }, [applications])
+
+  function onChange(e) {
+    const { name, value } = e.target
+    setForm(prev => ({ ...prev, [name]: value }))
+  }
+
+  async function onSubmit(e) {
+    e.preventDefault()
+    setError(null)
+    if (!applications.length) {
+      setError('Bitte zuerst eine Bewerbung anlegen')
+      return
+    }
+    if (!form.applicationId) {
+      setError('Bitte eine Bewerbung auswaehlen')
+      return
+    }
+    const trimmedName = form.name.trim()
+    if (!trimmedName) {
+      setError('Name ist erforderlich')
+      return
+    }
+    const trimmedLinked = form.linkedin.trim()
+    if (trimmedLinked && !isValidHttpUrl(trimmedLinked)) {
+      setError('LinkedIn muss eine gueltige URL sein')
+      return
+    }
+    try {
+      setSubmitting(true)
+      await window.api.createContact({
+        applicationId: Number(form.applicationId),
+        name: trimmedName,
+        title: form.title.trim() || undefined,
+        email: form.email.trim() || undefined,
+        phone: form.phone.trim() || undefined,
+        linkedin: trimmedLinked || undefined,
+      })
+      setForm(prev => ({
+        ...prev,
+        name: '',
+        title: '',
+        email: '',
+        phone: '',
+        linkedin: '',
+      }))
+      onCreated && onCreated()
+    } catch (err) {
+      setError(err?.message || String(err))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form onSubmit={onSubmit}>
+      <div className="panel-header">
+        <h2 className="panel-title">Neuer Kontakt</h2>
+        <p className="panel-subtitle">Lege eine Ansprechperson fuer eine Bewerbung an.</p>
+      </div>
+      <div className="form-grid">
+        <div className="form-row full">
+          <label>Bewerbung*:</label>
+          <select
+            name="applicationId"
+            value={form.applicationId}
+            onChange={onChange}
+            disabled={!applications.length}
+            required
+          >
+            <option value="">Bitte auswaehlen</option>
+            {applications.map(app => (
+              <option key={app.id} value={app.id}>{app.company}{app.role ? ` (${app.role})` : ''}</option>
+            ))}
+          </select>
+        </div>
+        <div className="form-row">
+          <label>Name*:</label>
+          <input
+            ref={nameRef}
+            name="name"
+            value={form.name}
+            onChange={onChange}
+            placeholder="z. B. Alex Doe"
+            required
+          />
+        </div>
+        <div className="form-row">
+          <label>Position:</label>
+          <input
+            name="title"
+            value={form.title}
+            onChange={onChange}
+            placeholder="z. B. Recruiter"
+          />
+        </div>
+        <div className="form-row">
+          <label>Email:</label>
+          <input
+            type="email"
+            name="email"
+            value={form.email}
+            onChange={onChange}
+            placeholder="alex@example.com"
+          />
+        </div>
+        <div className="form-row">
+          <label>Telefon:</label>
+          <input
+            name="phone"
+            value={form.phone}
+            onChange={onChange}
+            placeholder="+49 ..."
+          />
+        </div>
+        <div className="form-row full">
+          <label>LinkedIn:</label>
+          <input
+            name="linkedin"
+            value={form.linkedin}
+            onChange={onChange}
+            placeholder="https://www.linkedin.com/in/..."
+          />
+        </div>
+      </div>
+      <div className="form-actions">
+        {error && <div className="form-error">{error}</div>}
+        <button className="btn btn-primary" type="submit" disabled={submitting || !applications.length}>
+          {submitting ? 'Speichert...' : 'Kontakt speichern'}
+        </button>
+      </div>
+    </form>
+  )
+}
+
+function EditContactForm({ applications, item, onCancel, onSaved }) {
+  const [form, setForm] = useState({
+    applicationId: item.application_id ? String(item.application_id) : '',
+    name: item.name || '',
+    title: item.title || '',
+    email: item.email || '',
+    phone: item.phone || '',
+    linkedin: item.linkedin || '',
+  })
+  const [error, setError] = useState(null)
+  const [submitting, setSubmitting] = useState(false)
+  const nameRef = React.useRef(null)
+
+  function isValidHttpUrl(u) {
+    if (!u) return false
+    try {
+      const parsed = new URL(u)
+      return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+    } catch { return false }
+  }
+
+  useEffect(() => {
+    setTimeout(() => { try { nameRef.current?.focus() } catch {} }, 0)
+    const onHardFocus = () => { try { nameRef.current?.focus() } catch {} }
+    window.addEventListener('hardFocusReset', onHardFocus)
+    return () => window.removeEventListener('hardFocusReset', onHardFocus)
+  }, [])
+
+  useEffect(() => {
+    setForm({
+      applicationId: item.application_id ? String(item.application_id) : '',
+      name: item.name || '',
+      title: item.title || '',
+      email: item.email || '',
+      phone: item.phone || '',
+      linkedin: item.linkedin || '',
+    })
+  }, [item])
+
+  function onChange(e) {
+    const { name, value } = e.target
+    setForm(prev => ({ ...prev, [name]: value }))
+  }
+
+  async function onSubmit(e) {
+    e.preventDefault()
+    setError(null)
+    if (!form.applicationId) {
+      setError('Bitte eine Bewerbung auswaehlen')
+      return
+    }
+    const trimmedName = form.name.trim()
+    if (!trimmedName) {
+      setError('Name ist erforderlich')
+      return
+    }
+    const trimmedLinked = form.linkedin.trim()
+    if (trimmedLinked && !isValidHttpUrl(trimmedLinked)) {
+      setError('LinkedIn muss eine gueltige URL sein')
+      return
+    }
+    try {
+      setSubmitting(true)
+      await window.api.updateContact({
+        id: item.id,
+        applicationId: Number(form.applicationId),
+        name: trimmedName,
+        title: form.title.trim() || undefined,
+        email: form.email.trim() || undefined,
+        phone: form.phone.trim() || undefined,
+        linkedin: trimmedLinked || undefined,
+      })
+      onSaved && onSaved()
+    } catch (err) {
+      setError(err?.message || String(err))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form onSubmit={onSubmit}>
+      <div className="panel-header">
+        <h2 className="panel-title">Kontakt bearbeiten</h2>
+        <p className="panel-subtitle">Aktualisiere die Daten der Kontaktperson.</p>
+      </div>
+      <div className="form-grid">
+        <div className="form-row full">
+          <label>Bewerbung*:</label>
+          <select
+            name="applicationId"
+            value={form.applicationId}
+            onChange={onChange}
+            required
+          >
+            <option value="">Bitte auswaehlen</option>
+            {applications.map(app => (
+              <option key={app.id} value={app.id}>{app.company}{app.role ? ` (${app.role})` : ''}</option>
+            ))}
+          </select>
+        </div>
+        <div className="form-row">
+          <label>Name*:</label>
+          <input
+            ref={nameRef}
+            name="name"
+            value={form.name}
+            onChange={onChange}
+            required
+          />
+        </div>
+        <div className="form-row">
+          <label>Position:</label>
+          <input
+            name="title"
+            value={form.title}
+            onChange={onChange}
+          />
+        </div>
+        <div className="form-row">
+          <label>Email:</label>
+          <input
+            type="email"
+            name="email"
+            value={form.email}
+            onChange={onChange}
+          />
+        </div>
+        <div className="form-row">
+          <label>Telefon:</label>
+          <input
+            name="phone"
+            value={form.phone}
+            onChange={onChange}
+          />
+        </div>
+        <div className="form-row full">
+          <label>LinkedIn:</label>
+          <input
+            name="linkedin"
+            value={form.linkedin}
+            onChange={onChange}
+            placeholder="https://www.linkedin.com/in/..."
+          />
+        </div>
+      </div>
+      <div className="form-actions">
+        {error && <div className="form-error">{error}</div>}
+        <button type="button" className="btn btn-ghost" onClick={onCancel} disabled={submitting}>Abbrechen</button>
+        <button className="btn btn-primary" type="submit" disabled={submitting}>
+          {submitting ? 'Speichert...' : 'Kontakt speichern'}
+        </button>
+      </div>
+    </form>
+  )
+}
 function ActionsPage() {
   return (
     <div>
