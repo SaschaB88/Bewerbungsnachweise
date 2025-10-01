@@ -28,6 +28,22 @@ contextBridge.exposeInMainWorld("api", {
       return [];
     }
   },
+  listContacts: async () => {
+    try {
+      return await ipcRenderer.invoke("list-contacts");
+    } catch {
+      return [];
+    }
+  },
+  createContact: async (payload) => {
+    return await ipcRenderer.invoke("create-contact", payload);
+  },
+  updateContact: async (payload) => {
+    return await ipcRenderer.invoke("update-contact", payload);
+  },
+  deleteContact: async (id) => {
+    return await ipcRenderer.invoke("delete-contact", id);
+  },
   deleteApplication: async (id) => {
     return await ipcRenderer.invoke("delete-application", id);
   },
@@ -44,3 +60,5 @@ contextBridge.exposeInMainWorld("api", {
     return await ipcRenderer.invoke("focus-window");
   },
 });
+
+
