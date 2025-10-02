@@ -50,7 +50,6 @@ export default function App() {
                 // notify other views
                 window.dispatchEvent(new Event('statsChanged'))
               }}
-              onGoToApplications={() => setPage('applications')}
             />
           )}
           {page === 'applications' && (
@@ -77,7 +76,7 @@ function Card({ label, value }) {
   )
 }
 
-function DashboardView({ stats, showForm, setShowForm, notice, onCreated, onGoToApplications }) {
+function DashboardView({ stats, showForm, setShowForm, notice, onCreated }) {
   return (
     <>
       <header>
@@ -85,7 +84,6 @@ function DashboardView({ stats, showForm, setShowForm, notice, onCreated, onGoTo
         <p>Deine Leistungskennzahlen:</p>
         <div className="actions">
           <button className="btn btn-primary" onClick={() => setShowForm(v => !v)}>{showForm ? 'Schließen' : 'Bewerbung eintragen'}</button>
-          <button className="btn btn-ghost" onClick={onGoToApplications}>Bewerbungen anzeigen</button>
         </div>
         {notice && <p className="notice">{notice}</p>}
       </header>
@@ -1497,4 +1495,5 @@ function EditApplicationForm({ item, onCancel, onSaved }) {
     </form>
   )
 }
+
 
