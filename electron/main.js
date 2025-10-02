@@ -6,7 +6,7 @@
 const { app, BrowserWindow, ipcMain } = require("electron");
 const path = require("node:path");
 const { dashboardData, renderDashboard } = require("../src/dashboard");
-const { openDatabase, getStats, seedSampleData, createApplication, listApplications, deleteApplication, updateApplication, listContacts, createContact, updateContact, deleteContact, getApplicationFull, allowedStatuses } = require("../src/db");
+const { openDatabase, getStats, seedSampleData, createApplication, listApplications, deleteApplication, updateApplication, listContacts, createContact, updateContact, deleteContact, listActivities, createActivity, updateActivity, deleteActivity, getApplicationFull, allowedStatuses } = require("../src/db");
 
 let dbHandle = null;
 
@@ -92,6 +92,31 @@ app.whenReady().then(() => {
   ipcMain.handle("delete-contact", async (_evt, id) => {
     if (!dbHandle) throw new Error("Datenbank nicht initialisiert");
     const res = await deleteContact(dbHandle, "better-sqlite3", id);
+    return res;
+  });
+
+  ipcMain.handle("list-activities", async () => {
+    if (!dbHandle) return [];
+    return await listActivities(dbHandle, "better-sqlite3");
+  });
+
+  ipcMain.handle("create-activity", async (_evt, payload) => {
+    if (!dbHandle) throw new Error("Datenbank nicht initialisiert");
+    const res = await createActivity(dbHandle, "better-sqlite3", payload || {});
+    return res;
+  });
+
+  ipcMain.handle("update-activity", async (_evt, payload) => {
+    if (!dbHandle) throw new Error("Datenbank nicht initialisiert");
+    if (!payload || typeof payload.id === "undefined") throw new Error("Missing id");
+    const { id, ...patch } = payload;
+    const res = await updateActivity(dbHandle, "better-sqlite3", id, patch);
+    return res;
+  });
+
+  ipcMain.handle("delete-activity", async (_evt, id) => {
+    if (!dbHandle) throw new Error("Datenbank nicht initialisiert");
+    const res = await deleteActivity(dbHandle, "better-sqlite3", id);
     return res;
   });
 

@@ -44,6 +44,22 @@ contextBridge.exposeInMainWorld("api", {
   deleteContact: async (id) => {
     return await ipcRenderer.invoke("delete-contact", id);
   },
+  listActivities: async () => {
+    try {
+      return await ipcRenderer.invoke("list-activities");
+    } catch {
+      return [];
+    }
+  },
+  createActivity: async (payload) => {
+    return await ipcRenderer.invoke("create-activity", payload);
+  },
+  updateActivity: async (payload) => {
+    return await ipcRenderer.invoke("update-activity", payload);
+  },
+  deleteActivity: async (id) => {
+    return await ipcRenderer.invoke("delete-activity", id);
+  },
   deleteApplication: async (id) => {
     return await ipcRenderer.invoke("delete-application", id);
   },

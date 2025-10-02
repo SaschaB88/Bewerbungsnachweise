@@ -974,6 +974,152 @@ function updateContact(db, driverType = "better-sqlite3", id, patch = {}) {
 
 
 
+function listActivities(db, driverType = "better-sqlite3") {
+  const sql = `SELECT ac.id, ac.application_id, ac.type, ac.date, ac.notes, ac.created_at, a.company AS application_company, a.role AS application_role\n  FROM activities ac\n  JOIN applications a ON a.id = ac.application_id\n  ORDER BY ac.date IS NULL, ac.date DESC, ac.id DESC`;
+  if (driverType === "better-sqlite3") {
+    return db.prepare(sql).all();
+  }
+  return new Promise((resolve, reject) => {
+    db.all(sql, [], (err, rows) => {
+      if (err) return reject(err);
+      resolve(rows || []);
+    });
+  });
+}
+
+function createActivity(db, driverType = "better-sqlite3", input = {}) {
+  const appIdRaw = input.applicationId ?? input.application_id;
+  const appId = Number(appIdRaw);
+  if (!Number.isFinite(appId) || appId <= 0) throw new Error("'applicationId' is required");
+  const type = typeof input.type === 'string' ? input.type.trim() : '';
+  if (!type) throw new Error("'type' is required");
+  const dateValue = typeof input.date === 'string' ? input.date.trim() : '';
+  const date = dateValue ? new Date(dateValue) : null;
+  if (dateValue && Number.isNaN(date.getTime())) {
+    throw new Error("'date' must be a valid ISO date string");
+  }
+  const notes = typeof input.notes === 'string' ? input.notes.trim() : '';
+  const isoDate = date ? date.toISOString() : null;
+  if (driverType === "better-sqlite3") {
+    try {
+      const stmt = db.prepare("INSERT INTO activities(application_id, type, date, notes) VALUES (?,?,?,?)");
+      const res = stmt.run(appId, type, isoDate, notes || null);
+      return { id: res.lastInsertRowid, changes: res.changes || 0 };
+    } catch (err) {
+      if (err && typeof err.message === 'string' && err.message.includes('FOREIGN KEY constraint failed')) {
+        throw new Error("Application not found");
+      }
+      throw err;
+    }
+  }
+  return new Promise((resolve, reject) => {
+    db.get("SELECT id FROM applications WHERE id = ?", [appId], (err, row) => {
+      if (err) return reject(err);
+      if (!row) return reject(new Error("Application not found"));
+      const sql = "INSERT INTO activities(application_id, type, date, notes) VALUES (?,?,?,?)";
+      db.run(sql, [appId, type, isoDate, notes || null], function (err2) {
+        if (err2) {
+          if (typeof err2.message === 'string' && err2.message.includes('FOREIGN KEY constraint failed')) {
+            return reject(new Error("Application not found"));
+          }
+          return reject(err2);
+        }
+        resolve({ id: this.lastID, changes: this.changes || 0 });
+      });
+    });
+  });
+}
+
+function updateActivity(db, driverType = "better-sqlite3", id, patch = {}) {
+  const activityId = Number(id);
+  if (!Number.isFinite(activityId) || activityId <= 0) throw new Error("Invalid id");
+  const fields = {};
+  if (Object.prototype.hasOwnProperty.call(patch, 'type')) {
+    const type = typeof patch.type === 'string' ? patch.type.trim() : '';
+    if (!type) throw new Error("'type' cannot be empty");
+    fields.type = type;
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'date')) {
+    const raw = typeof patch.date === 'string' ? patch.date.trim() : '';
+    if (!raw) {
+      fields.date = null;
+    } else {
+      const parsed = new Date(raw);
+      if (Number.isNaN(parsed.getTime())) throw new Error("'date' must be a valid ISO date string");
+      fields.date = parsed.toISOString();
+    }
+  }
+  if (Object.prototype.hasOwnProperty.call(patch, 'notes')) {
+    const notes = typeof patch.notes === 'string' ? patch.notes.trim() : '';
+    fields.notes = notes || null;
+  }
+  let targetAppId;
+  if (Object.prototype.hasOwnProperty.call(patch, 'applicationId') || Object.prototype.hasOwnProperty.call(patch, 'application_id')) {
+    const raw = Object.prototype.hasOwnProperty.call(patch, 'applicationId') ? patch.applicationId : patch.application_id;
+    const appId = Number(raw);
+    if (!Number.isFinite(appId) || appId <= 0) throw new Error("Invalid applicationId");
+    targetAppId = appId;
+    fields.application_id = appId;
+  }
+  const keys = Object.keys(fields);
+  if (keys.length === 0) return { changes: 0 };
+  if (driverType === "better-sqlite3") {
+    const sets = keys.map(k => `${k} = ?`).join(", ");
+    const values = keys.map(k => fields[k]);
+    const stmt = db.prepare(`UPDATE activities SET ${sets} WHERE id = ?`);
+    try {
+      const res = stmt.run(...values, activityId);
+      return { changes: res.changes || 0 };
+    } catch (err) {
+      if (err && typeof err.message === 'string' && err.message.includes('FOREIGN KEY constraint failed')) {
+        throw new Error("Application not found");
+      }
+      throw err;
+    }
+  }
+  return new Promise((resolve, reject) => {
+    const proceed = () => {
+      const sets = keys.map(k => `${k} = ?`).join(", ");
+      const values = keys.map(k => fields[k]);
+      values.push(activityId);
+      const sql = `UPDATE activities SET ${sets} WHERE id = ?`;
+      db.run(sql, values, function (err) {
+        if (err) {
+          if (typeof err.message === 'string' && err.message.includes('FOREIGN KEY constraint failed')) {
+            return reject(new Error("Application not found"));
+          }
+          return reject(err);
+        }
+        resolve({ changes: this.changes || 0 });
+      });
+    };
+    if (typeof targetAppId !== 'undefined') {
+      db.get("SELECT id FROM applications WHERE id = ?", [targetAppId], (err, row) => {
+        if (err) return reject(err);
+        if (!row) return reject(new Error("Application not found"));
+        proceed();
+      });
+    } else {
+      proceed();
+    }
+  });
+}
+
+function deleteActivity(db, driverType = "better-sqlite3", id) {
+  const activityId = Number(id);
+  if (!Number.isFinite(activityId) || activityId <= 0) throw new Error("Invalid id");
+  if (driverType === "better-sqlite3") {
+    const stmt = db.prepare("DELETE FROM activities WHERE id = ?");
+    const res = stmt.run(activityId);
+    return { changes: res.changes || 0 };
+  }
+  return new Promise((resolve, reject) => {
+    db.run("DELETE FROM activities WHERE id = ?", [activityId], function (err) {
+      if (err) return reject(err);
+      resolve({ changes: this.changes || 0 });
+    });
+  });
+}
 function deleteContact(db, driverType = "better-sqlite3", id) {
 
   const contactId = Number(id);
@@ -1170,6 +1316,14 @@ module.exports = {
 
   deleteContact,
 
+  listActivities,
+
+  createActivity,
+
+  updateActivity,
+
+  deleteActivity,
+
   isValidHttpUrl,
 
   getApplicationFull,
@@ -1177,6 +1331,10 @@ module.exports = {
   allowedStatuses,
 
 };
+
+
+
+
 
 
 

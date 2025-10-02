@@ -790,19 +790,489 @@ function EditContactForm({ applications, item, onCancel, onSaved }) {
     </form>
   )
 }
+function toDateTimeLocalValue(value) {
+  if (!value) return '';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  const year = parsed.getFullYear();
+  const month = pad(parsed.getMonth() + 1);
+  const day = pad(parsed.getDate());
+  const hours = pad(parsed.getHours());
+  const minutes = pad(parsed.getMinutes());
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
+}
+
 function ActionsPage() {
+  const [activities, setActivities] = useState([]);
+  const [applications, setApplications] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const [showForm, setShowForm] = useState(false);
+  const [editItem, setEditItem] = useState(null);
+  const [confirmItem, setConfirmItem] = useState(null);
+
+  const mountedRef = React.useRef(true);
+
+  const load = React.useCallback(async (withSpinner = false) => {
+    if (withSpinner) setLoading(true);
+    if (mountedRef.current) setError(null);
+    try {
+      const activityPromise = window.api?.listActivities?.() || Promise.resolve([]);
+      const appPromise = window.api?.listApplications?.() || Promise.resolve([]);
+      const [activityRows, appRows] = await Promise.all([activityPromise, appPromise]);
+      if (!mountedRef.current) return;
+      setActivities(activityRows);
+      setApplications(appRows);
+    } catch (err) {
+      if (mountedRef.current) setError(err?.message || String(err));
+    } finally {
+      if (withSpinner && mountedRef.current) setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    load(true);
+    const onStatsChanged = () => { load(false); };
+    window.addEventListener('statsChanged', onStatsChanged);
+    return () => {
+      mountedRef.current = false;
+      window.removeEventListener('statsChanged', onStatsChanged);
+    };
+  }, [load]);
+
+  const hasApplications = applications.length > 0;
+  const rowClickable = !showForm && !editItem;
+
   return (
     <div>
       <header>
-        <h1>Aktionen</h1>
-        <p>Schnellzugriffe und nützliche Aktionen.</p>
+        <h1>Aktivitaeten</h1>
+        <p>Verwalte Follow-ups, Gespraeche und weitere Aktionen.</p>
+        <div className="actions">
+          <button
+            className="btn btn-primary"
+            disabled={!hasApplications && !showForm}
+            onClick={async () => {
+              if (!hasApplications && !showForm) return;
+              try { await window.api.focusWindow?.(); } catch {}
+              setEditItem(null);
+              setShowForm(v => !v);
+              setTimeout(() => { window.dispatchEvent(new Event('hardFocusReset')); }, 10);
+            }}
+          >{showForm ? 'Schliessen' : 'Aktivitaet erfassen'}</button>
+        </div>
+        {!hasApplications && (
+          <p className="notice" style={{ marginTop: 12 }}>Lege zuerst eine Bewerbung an, um Aktivitaeten zu erfassen.</p>
+        )}
       </header>
-      <div className="panel">
-        <p>Diese Ansicht ist noch leer. Hier könnten Batch-Operationen, Exporte und weitere Tools erscheinen.</p>
-      </div>
+      {notice && <p className="notice">{notice}</p>}
+      {showForm && (
+        <div className="panel" style={{ marginBottom: 16 }}>
+          <AddActivityForm
+            applications={applications}
+            onCreated={async () => {
+              setShowForm(false);
+              setNotice('Aktivitaet gespeichert');
+              setTimeout(() => setNotice(null), 2500);
+              await load(false);
+              try { window.dispatchEvent(new Event('statsChanged')); } catch {}
+            }}
+          />
+        </div>
+      )}
+      {loading && <p>Laedt...</p>}
+      {error && <p style={{ color: 'crimson' }}>{error}</p>}
+      {!loading && !error && (
+        activities.length === 0 ? (
+          <p>Keine Aktivitaeten gespeichert.</p>
+        ) : (
+          <div className="panel">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Typ</th>
+                  <th>Bewerbung</th>
+                  <th>Datum</th>
+                  <th>Notizen</th>
+                  <th>Erstellt</th>
+                  <th>Aktionen</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activities.map(act => {
+                  const companyLabel = act.application_company
+                    ? (act.application_role ? `${act.application_company} (${act.application_role})` : act.application_company)
+                    : '-';
+                  const formattedDate = act.date ? new Date(act.date).toLocaleString() : '';
+                  const createdAt = act.created_at ? new Date(act.created_at).toLocaleString() : '';
+                  const rowProps = rowClickable ? {
+                    className: 'row-clickable',
+                    onClick: (event) => {
+                      const tag = event.target.tagName.toLowerCase();
+                      if (tag === 'button' || event.target.closest('button') || event.target.closest('a')) return;
+                      window.api.openApplicationWindow(act.application_id);
+                    },
+                  } : {};
+                  return (
+                    <tr key={act.id} {...rowProps}>
+                      <td>{act.type}</td>
+                      <td>{companyLabel}</td>
+                      <td>{formattedDate}</td>
+                      <td className="prewrap">{act.notes || ''}</td>
+                      <td>{createdAt}</td>
+                      <td>
+                        <div className="actions">
+                          <button
+                            className="btn"
+                            onClick={() => {
+                              setShowForm(false);
+                              setEditItem(act);
+                              setTimeout(() => { window.dispatchEvent(new Event('hardFocusReset')); }, 10);
+                            }}
+                          >Bearbeiten</button>
+                          <button
+                            className="btn btn-danger"
+                            onClick={() => setConfirmItem(act)}
+                          >Loeschen</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )
+      )}
+      {editItem && (
+        <div className="panel" style={{ marginTop: 16 }}>
+          <EditActivityForm
+            applications={applications}
+            item={editItem}
+            onCancel={() => setEditItem(null)}
+            onSaved={async () => {
+              setEditItem(null);
+              setNotice('Aktivitaet aktualisiert');
+              setTimeout(() => setNotice(null), 2500);
+              await load(false);
+              try { window.dispatchEvent(new Event('statsChanged')); } catch {}
+            }}
+          />
+        </div>
+      )}
+      {confirmItem && (
+        <div className="modal-backdrop" onClick={() => setConfirmItem(null)}>
+          <div className="modal" onClick={(event) => event.stopPropagation()} role="dialog" aria-modal="true">
+            <h2>Aktivitaet loeschen?</h2>
+            <p>Moechtest du die Aktivitaet "{confirmItem.type}" wirklich loeschen? Diese Aktion kann nicht rueckgaengig gemacht werden.</p>
+            <div className="modal-actions">
+              <button className="btn btn-ghost" onClick={() => setConfirmItem(null)}>Abbrechen</button>
+              <button
+                className="btn btn-danger"
+                onClick={async () => {
+                  try {
+                    await window.api.deleteActivity(confirmItem.id);
+                    setConfirmItem(null);
+                    setActivities(prev => prev.filter(a => a.id !== confirmItem.id));
+                    setNotice('Aktivitaet geloescht');
+                    setTimeout(() => setNotice(null), 2000);
+                    await load(false);
+                    try { window.dispatchEvent(new Event('statsChanged')); } catch {}
+                    try { await window.api.focusWindow?.(); } catch {}
+                    try { document.activeElement && document.activeElement.blur(); } catch {}
+                  } catch (err) {
+                    setError(err?.message || String(err));
+                  }
+                }}
+              >Loeschen</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
-  )
+  );
 }
+
+function AddActivityForm({ applications, onCreated }) {
+  const [form, setForm] = useState({
+    applicationId: applications.length ? String(applications[0].id) : '',
+    type: '',
+    date: '',
+    notes: '',
+  });
+  const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const typeRef = React.useRef(null);
+
+  useEffect(() => {
+    setTimeout(() => { try { typeRef.current?.focus(); } catch {} }, 0);
+    const onHardFocus = () => { try { typeRef.current?.focus(); } catch {} };
+    window.addEventListener('hardFocusReset', onHardFocus);
+    return () => window.removeEventListener('hardFocusReset', onHardFocus);
+  }, []);
+
+  useEffect(() => {
+    if (!applications.length) return;
+    setForm(prev => {
+      if (prev.applicationId) return prev;
+      return { ...prev, applicationId: String(applications[0].id) };
+    });
+  }, [applications]);
+
+  function onChange(event) {
+    const { name, value } = event.target;
+    setForm(prev => ({ ...prev, [name]: value }));
+  }
+
+  async function onSubmit(event) {
+    event.preventDefault();
+    setError(null);
+    if (!applications.length) {
+      setError('Bitte zuerst eine Bewerbung anlegen');
+      return;
+    }
+    if (!form.applicationId) {
+      setError('Bitte eine Bewerbung auswaehlen');
+      return;
+    }
+    const type = form.type.trim();
+    if (!type) {
+      setError('Typ ist erforderlich');
+      return;
+    }
+    const dateValue = form.date.trim();
+    let isoDate = null;
+    if (dateValue) {
+      const parsed = new Date(dateValue);
+      if (Number.isNaN(parsed.getTime())) {
+        setError('Bitte gueltiges Datum angeben');
+        return;
+      }
+      isoDate = parsed.toISOString();
+    }
+    const notes = form.notes.trim();
+    try {
+      setSubmitting(true);
+      await window.api.createActivity({
+        applicationId: Number(form.applicationId),
+        type,
+        date: isoDate || undefined,
+        notes: notes || undefined,
+      });
+      setForm(prev => ({
+        ...prev,
+        type: '',
+        date: '',
+        notes: '',
+      }));
+      onCreated && onCreated();
+    } catch (err) {
+      setError(err?.message || String(err));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={onSubmit}>
+      <div className="panel-header">
+        <h2 className="panel-title">Neue Aktivitaet</h2>
+        <p className="panel-subtitle">Dokumentiere einen Schritt in deinem Bewerbungsprozess.</p>
+      </div>
+      <div className="form-grid">
+        <div className="form-row full">
+          <label>Bewerbung*:</label>
+          <select
+            name="applicationId"
+            value={form.applicationId}
+            onChange={onChange}
+            disabled={!applications.length}
+            required
+          >
+            <option value="">Bitte auswaehlen</option>
+            {applications.map(app => (
+              <option key={app.id} value={app.id}>{app.company}{app.role ? ` (${app.role})` : ''}</option>
+            ))}
+          </select>
+        </div>
+        <div className="form-row">
+          <label>Typ*:</label>
+          <input
+            ref={typeRef}
+            name="type"
+            value={form.type}
+            onChange={onChange}
+            placeholder="z. B. Telefoninterview"
+            required
+          />
+        </div>
+        <div className="form-row">
+          <label>Datum:</label>
+          <input
+            type="datetime-local"
+            name="date"
+            value={form.date}
+            onChange={onChange}
+          />
+        </div>
+        <div className="form-row full">
+          <label>Notizen:</label>
+          <textarea
+            name="notes"
+            value={form.notes}
+            onChange={onChange}
+            rows={4}
+            placeholder="Optionale Notizen"
+          />
+        </div>
+      </div>
+      <div className="form-actions">
+        {error && <div className="form-error">{error}</div>}
+        <button className="btn btn-primary" type="submit" disabled={submitting || !applications.length}>
+          {submitting ? 'Speichert...' : 'Aktivitaet speichern'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function EditActivityForm({ applications, item, onCancel, onSaved }) {
+  const [form, setForm] = useState({
+    applicationId: item.application_id ? String(item.application_id) : '',
+    type: item.type || '',
+    date: toDateTimeLocalValue(item.date),
+    notes: item.notes || '',
+  });
+  const [error, setError] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const typeRef = React.useRef(null);
+
+  useEffect(() => {
+    setTimeout(() => { try { typeRef.current?.focus(); } catch {} }, 0);
+    const onHardFocus = () => { try { typeRef.current?.focus(); } catch {} };
+    window.addEventListener('hardFocusReset', onHardFocus);
+    return () => window.removeEventListener('hardFocusReset', onHardFocus);
+  }, []);
+
+  useEffect(() => {
+    setForm({
+      applicationId: item.application_id ? String(item.application_id) : '',
+      type: item.type || '',
+      date: toDateTimeLocalValue(item.date),
+      notes: item.notes || '',
+    });
+  }, [item]);
+
+  function onChange(event) {
+    const { name, value } = event.target;
+    setForm(prev => ({ ...prev, [name]: value }));
+  }
+
+  async function onSubmit(event) {
+    event.preventDefault();
+    setError(null);
+    if (!form.applicationId) {
+      setError('Bitte eine Bewerbung auswaehlen');
+      return;
+    }
+    const type = form.type.trim();
+    if (!type) {
+      setError('Typ ist erforderlich');
+      return;
+    }
+    const dateValue = form.date.trim();
+    let isoDate = null;
+    if (dateValue) {
+      const parsed = new Date(dateValue);
+      if (Number.isNaN(parsed.getTime())) {
+        setError('Bitte gueltiges Datum angeben');
+        return;
+      }
+      isoDate = parsed.toISOString();
+    }
+    const notes = form.notes.trim();
+    const notesPayload = notes ? notes : null;
+    try {
+      setSubmitting(true);
+      await window.api.updateActivity({
+        id: item.id,
+        applicationId: Number(form.applicationId),
+        type,
+        date: dateValue ? isoDate : null,
+        notes: notesPayload,
+      });
+      onSaved && onSaved();
+    } catch (err) {
+      setError(err?.message || String(err));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={onSubmit}>
+      <div className="panel-header">
+        <h2 className="panel-title">Aktivitaet bearbeiten</h2>
+        <p className="panel-subtitle">Passe die Details deiner Aktivitaet an.</p>
+      </div>
+      <div className="form-grid">
+        <div className="form-row full">
+          <label>Bewerbung*:</label>
+          <select
+            name="applicationId"
+            value={form.applicationId}
+            onChange={onChange}
+            required
+          >
+            <option value="">Bitte auswaehlen</option>
+            {applications.map(app => (
+              <option key={app.id} value={app.id}>{app.company}{app.role ? ` (${app.role})` : ''}</option>
+            ))}
+          </select>
+        </div>
+        <div className="form-row">
+          <label>Typ*:</label>
+          <input
+            ref={typeRef}
+            name="type"
+            value={form.type}
+            onChange={onChange}
+            required
+          />
+        </div>
+        <div className="form-row">
+          <label>Datum:</label>
+          <input
+            type="datetime-local"
+            name="date"
+            value={form.date}
+            onChange={onChange}
+          />
+        </div>
+        <div className="form-row full">
+          <label>Notizen:</label>
+          <textarea
+            name="notes"
+            value={form.notes}
+            onChange={onChange}
+            rows={4}
+          />
+        </div>
+      </div>
+      <div className="form-actions">
+        {error && <div className="form-error">{error}</div>}
+        <button type="button" className="btn btn-ghost" onClick={onCancel} disabled={submitting}>Abbrechen</button>
+        <button className="btn btn-primary" type="submit" disabled={submitting}>
+          {submitting ? 'Speichert...' : 'Aktivitaet speichern'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 
 function AddApplicationForm({ onCreated }) {
   const [allowed, setAllowed] = useState([
@@ -1027,3 +1497,4 @@ function EditApplicationForm({ item, onCancel, onSaved }) {
     </form>
   )
 }
+
