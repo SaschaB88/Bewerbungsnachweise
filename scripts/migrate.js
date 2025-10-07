@@ -1,17 +1,11 @@
 "use strict";
 
-const path = require("node:path");
-const { openDatabase } = require("../src/db");
+const { openDatabase, resolveDbPath } = require("../src/db");
 
 function main() {
-  const target = process.argv[2] || path.join(process.cwd(), "data/apptracker.sqlite");
-  const db = openDatabase({ path: target });
-  console.log("Migrated schema at:", target);
-  if (db.pragma) {
-    db.close && db.close();
-  } else {
-    db.close && db.close();
-  }
+  const target = resolveDbPath(process.argv[2]);
+  openDatabase({ path: target });
+  console.log("Datenbank initialisiert:", target);
 }
 
 try {
