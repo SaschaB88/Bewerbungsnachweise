@@ -1,6 +1,6 @@
 {
-  "name": "electron-mvp-dashboard",
-  "version": "0.1.0",
+  "name": "bewerbungs-cockpit",
+  "version": "0.0.0",
   "private": true,
   "description": "MVP Electron-style app with dashboard and Node tests",
   "main": "electron/main.js",
@@ -8,23 +8,67 @@
     "start": "node scripts/start.js",
     "start:electron": "electron .",
     "dev": "vite",
-    "build": "vite build",
+    "build:renderer": "vite build",
+    "build:electron": "electron-builder",
+    "build": "npm run build:renderer && npm run build:electron",
     "test": "node --test",
     "db:migrate": "node scripts/migrate.js",
-    "db:seed": "node scripts/seed.js",
-    "rebuild:electron": "electron-rebuild -f -w better-sqlite3",
-    "rebuild:node": "npm rebuild better-sqlite3"
+    "db:seed": "node scripts/seed.js"
   },
   "author": "",
   "license": "UNLICENSED",
   "devDependencies": {
     "@vitejs/plugin-react": "^5.0.4",
-    "electron": "^38.2.0",
+    "electron": "^25.0.0",
+    "electron-builder": "^23.6.0",
     "vite": "^7.1.7"
   },
   "dependencies": {
-    "better-sqlite3": "^12.4.1",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
+  },
+  "build": {
+    "appId": "com.example.bewerbungs-cockpit",
+    "productName": "Bewerbungs-Cockpit",
+    "files": [
+      "dist/**",
+      "electron/**",
+      "preload/**",
+      "src/**",
+      "node_modules/**",
+      "package.json",
+      "data/**"
+    ],
+    "extraResources": [
+      {
+        "from": "data",
+        "to": "data",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb",
+        "zip"
+      ]
+    }
   }
 }
