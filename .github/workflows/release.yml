@@ -1,0 +1,120 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            builder_flag: "linux zip"
+          - os: macos-latest
+            platform: mac
+            builder_flag: "mac zip"
+          - os: windows-latest
+            platform: windows
+            builder_flag: "win zip"
+    runs-on: ${{ matrix.os }}
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: false
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build renderer
+        run: npm run build:renderer
+
+      - name: Build Electron package
+        run: npm run build:electron -- --${{ matrix.builder_flag }}
+
+      - name: Upload release directory
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.platform }}
+          path: release
+          if-no-files-found: error
+
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Determine release metadata
+        id: metadata
+        run: |
+          set -euo pipefail
+          version=$(jq -r '.version' package.json)
+          if [ -z "$version" ] || [ "$version" = "null" ]; then
+            echo "Unable to determine project version" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=v${version}-build-${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+          echo "name=Bewerbungs Cockpit v${version}" >> "$GITHUB_OUTPUT"
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          merge-multiple: false
+
+      - name: Prepare release archives
+        id: prepare
+        env:
+          RELEASE_VERSION: ${{ steps.metadata.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p packaged
+          for dir in release-*; do
+            [ -d "$dir" ] || continue
+            platform="${dir#release-}"
+            archive="bewerbungs-cockpit-${platform}-v${RELEASE_VERSION}.zip"
+            (cd "$dir" && zip -r "../packaged/$archive" .)
+          done
+          {
+            echo "files<<EOF"
+            printf '%s\n' packaged/*.zip
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Upload release archives artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-zips
+          path: packaged
+          if-no-files-found: error
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.metadata.outputs.tag }}
+          name: ${{ steps.metadata.outputs.name }}
+          body: |
+            Automated build for version ${{ steps.metadata.outputs.version }} from commit ${{ github.sha }}.
+          files: ${{ steps.prepare.outputs.files }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
