@@ -82,7 +82,7 @@ input, select, textarea {
   padding: 10px 12px;
   border-radius: 10px;
   border: 1px solid var(--surface-strong);
-  background: rgba(255,255,255,0.07);
+  background: rgba(255,255,255,0.10);
   color: var(--text);
   pointer-events: auto;
   -webkit-user-select: text;
@@ -90,6 +90,10 @@ input, select, textarea {
 }
 input::placeholder, textarea::placeholder { color: var(--muted); opacity: 0.85; }
 input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(110,168,254,0.2); }
+
+/* Improve readability of dropdown entries */
+select { color: var(--text); background-color: rgba(255,255,255,0.12); }
+select option { color: #e6e9ef; background-color: #1a2031; }
 
 @media (max-width: 720px) {
   .form-grid { grid-template-columns: 1fr; }
